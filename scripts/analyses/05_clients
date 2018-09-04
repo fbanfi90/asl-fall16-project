@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./05_clients ../../log/experiments/05_writes_effect_16-11-21_09:37:46
+
+REPETITIONS=4
+RUNTIME=50
+WARMUP=10
+STABLE_PHASE=30
+PLOTDIR=05_plots
+OUTPRE=05_clients
+FONTSZ=20
+
+NM[4]=TPS
+NM[9]=RT
+LM[4]="Throughput (requests / s)"
+LM[9]="Response time ({/Symbol m}s)"
+YM[4]=25000
+YM[9]=60000
+KM[4]=r
+KM[9]=l
+NR[0]=one
+NR[1]=full
+
+for M in {4,9}
+do
+    for OP in {Set,Get}
+    do
+        for R in {0,1}
+        do
+            OUT=$OUTPRE'_'${NM[$M]}'_'${NR[$R]}
+            rm -f $OUT.data
+            for S in $(seq 3 2 7)
+            do
+                echo -n "$S " >> $OUT.data
+                for W in {1,5,10}
+                do
+                    AVG_R=
+                    STD_R=
+                    for r in $(seq 1 $REPETITIONS)
+                    do
+                        AVG_C=
+                        STD_C=
+                        for c in $(seq 3)
+                        do
+                            DATA=$(cat $@/client$c'_'S$S'_'R$(( (S - 1) * R + 1 ))'_'W$W'_'r$r.log | grep -A 2 "Total Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk -v c=$M '{ print $c }')
+                            AVG=$(echo "$DATA" | awk '{ x += $1 } END { print x / NR; }')
+                            AVG_C=$(echo -e "$AVG_C\n$AVG")
+                            if [ $M = 4 ]
+                            then
+                                STD=$(echo "$DATA" | awk -v avg=$AVG '{ x += ($1 - avg) ^ 2 } END { print x / (NR - 1) }')
+                            else
+                                STDs=$(cat $@/client$c'_'S$S'_'R$(( (S - 1) * R + 1 ))'_'W$W'_'r$r.log | grep -A 2 "Total Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $10 }')
+                                STD=$(echo "$STDs" | awk '{ x += $1 } END { print x / NR; }')
+                            fi
+                            STD_C=$(echo -e "$STD_C\n$STD")
+                        done
+                        AVG_R=$(echo -e "$AVG_R\n$(echo "$AVG_C" | tail -n +2 | awk '{ x += $1 } END { print x }')")
+                        if [ $M = 4 ]
+                        then
+                            STD_R=$(echo -e "$STD_R\n$(echo "$STD_C" | tail -n +2 | awk '{ x += $1 } END { print sqrt(x) }')")
+                        else
+                            STD_R=$(echo -e "$STD_R\n$(echo "$STD_C" | tail -n +2 | awk '{ x += $1 } END { print x }')")
+                        fi
+                    done
+                    AVG=$(echo "$AVG_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+                    STD=$(echo "$STD_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+                    echo -n "$AVG $STD " >> $OUT.data
+                done
+                echo "" >> $OUT.data
+            done
+
+            mkdir -p $PLOTDIR
+            gnuplot -p << EOF
+                set terminal postscript eps color 'Times-Roman,$FONTSZ'
+                set output '| epstopdf --filter --outfile=$PLOTDIR/$OUT.pdf'
+                set key ${KM[$M]}
+                set xlabel 'Servers'
+                set ylabel '${LM[$M]}'
+                set yrange [0:${YM[$M]}]
+                set style data histogram
+                set style fill solid border
+                set style fill solid 0.3
+                set bars front
+                set style histogram clustered errorbars linewidth 1.5
+                plot '$OUT.data' using 2:3:xticlabels(1) title 'W=1%', \
+                    '' using 4:5:xticlabels(1) title 'W=5%', \
+                    '' using 6:7:xticlabels(1) title 'W=10%'
+EOF
+            #sleep 0.5
+            #llpp $PLOTDIR/$OUT.pdf &
+        done
+    done
+done

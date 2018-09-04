@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Set log files names of 5x40 configuration.
+LOGDIR=../../log/5x40_vs_3x70
+LOGFILE5_1=$LOGDIR/5-1.log
+LOGFILE5_2=$LOGDIR/5-2.log
+LOGFILE5_3=$LOGDIR/5-3.log
+LOGFILE5_4=$LOGDIR/5-4.log
+LOGFILE5_5=$LOGDIR/5-5.log
+
+# Set log files names of 3x70 configuration.
+LOGDIR=../log/5x40_vs_3x70
+LOGFILE3_1=$LOGDIR/3-1.log
+LOGFILE3_2=$LOGDIR/3-2.log
+LOGFILE3_3=$LOGDIR/3-3.log
+
+# Read clients data for 5x40 configuration.
+TPS5_1=$(cat $LOGFILE5_1 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS5_1_AVG=$(echo $TPS5_1 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS5_1_STD=$(echo $TPS5_1 | awk -v avg="$TPS5_1_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+TPS5_2=$(cat $LOGFILE5_2 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS5_2_AVG=$(echo $TPS5_2 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS5_2_STD=$(echo $TPS5_2 | awk -v avg="$TPS5_2_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+TPS5_3=$(cat $LOGFILE5_3 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS5_3_AVG=$(echo $TPS5_3 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS5_3_STD=$(echo $TPS5_3 | awk -v avg="$TPS5_3_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+TPS5_4=$(cat $LOGFILE5_4 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS5_4_AVG=$(echo $TPS5_4 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS5_4_STD=$(echo $TPS5_4 | awk -v avg="$TPS5_4_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+TPS5_5=$(cat $LOGFILE5_5 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS5_5_AVG=$(echo $TPS5_5 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS5_5_STD=$(echo $TPS5_5 | awk -v avg="$TPS5_5_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+
+# Read clients data for 3x70 configuration.
+TPS3_1=$(cat $LOGFILE3_1 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS3_1_AVG=$(echo $TPS3_1 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS3_1_STD=$(echo $TPS3_1 | awk -v avg="$TPS3_1_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+TPS3_2=$(cat $LOGFILE3_2 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS3_2_AVG=$(echo $TPS3_2 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS3_2_STD=$(echo $TPS3_2 | awk -v avg="$TPS3_2_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+TPS3_3=$(cat $LOGFILE3_3 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+TPS3_3_AVG=$(echo $TPS3_3 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+TPS3_3_STD=$(echo $TPS3_3 | awk -v avg="$TPS3_3_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+
+# Memorize TPS's AVG and STD of 5x40 configuration.
+TPS5_AVG=$(echo $TPS5_1_AVG $TPS5_2_AVG $TPS5_3_AVG $TPS5_4_AVG $TPS5_5_AVG | awk '{print $1 + $2 + $3 + $4 + $5}')
+TPS5_STD=$(echo $TPS5_1_STD $TPS5_2_STD $TPS5_3_STD $TPS5_4_STD $TPS5_5_STD | awk '{print sqrt($1 + $2 + $3 + $4 + $5)}')
+
+# Memorize TPS's AVG and STD of 3x70 configuration.
+TPS3_AVG=$(echo $TPS3_1_AVG $TPS3_2_AVG $TPS3_3_AVG | awk '{print $1 + $2 + $3}')
+TPS3_STD=$(echo $TPS3_1_STD $TPS3_2_STD $TPS3_3_STD | awk '{print sqrt($1 + $2 + $3)}')
+
+# Display comparison.
+echo $TPS5_AVG $TPS5_STD
+echo $TPS3_AVG $TPS3_STD

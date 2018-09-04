@@ -1,0 +1,132 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./03_breakdown
+
+# Command to fix old middleware log files (removes all ',').
+#for f in middleware*; do sed 's/,//g' $f > TEMP; mv TEMP $f; done
+
+LOG=../../log/experiments/03_maximum_throughput_16-11-11_21:56:33/middleware_C040_T16
+
+# Set interval size for histograms.
+INT=500
+#INT=100
+MAXT=20000
+MAXR=1000
+WIDTH=1.0
+#WIDTH=0.5
+PLOTDIR=03_plots
+DATAFILE=03_breakdown_percs.data
+FONTSZ=20
+OPAC=1.0
+
+# Concatenate timings in middle third of each repetition.
+DATA=''
+for f in $LOG'_'R0{1,2,3,4}.log
+do
+    TOT=$(cat $f | tail -n 1 | awk '{ print $2 }')
+    MIN=$(($TOT / 300))
+    MAX=$((2 * $TOT / 300))
+    FDATA=$(cat $f | grep GET | tail -n $MAX | head -n $MIN)
+    DATA=$(echo -e "$DATA\n$FDATA")
+done
+CNT=$(echo "$DATA" | wc -l)
+
+# Get means of timings.
+AVGS=$(echo "$DATA" | awk '{ tot += $3; que += $4; srv += $5; n++ } END { if (n > 0) print tot / n, que / n, srv / n; }')
+TOT_AVG=$(echo $AVGS | awk '{ print $1 }')
+QUE_AVG=$(echo $AVGS | awk '{ print $2 }')
+SRV_AVG=$(echo $AVGS | awk '{ print $3 }')
+
+# Get standard deviations of timings.
+STDS=$(echo "$DATA" | awk -v tot_avg=$TOT_AVG -v que_avg=$QUE_AVG -v srv_avg=$SRV_AVG '{ tot += ($3 - tot_avg) ^ 2; que += ($4 - que_avg) ^ 2; srv += ($5 - srv_avg) ^ 2; n++ } END { if (n > 0) print sqrt(tot / (n - 1)), sqrt(que / (n - 1)), sqrt(srv / (n - 1)); }')
+TOT_STD=$(echo $STDS | awk '{ print $1 }')
+QUE_STD=$(echo $STDS | awk '{ print $2 }')
+SRV_STD=$(echo $STDS | awk '{ print $3 }')
+
+# Sort each timing.
+TOT_SRT=$(echo "$DATA" | awk '{ print $3 }' | sort -n)
+QUE_SRT=$(echo "$DATA" | awk '{ print $4 }' | sort -n)
+SRV_SRT=$(echo "$DATA" | awk '{ print $5 }' | sort -n)
+
+# Print 50, 90, 95, and 99 quantiles of timings.
+echo -e "Mean\tStd\t50%\t80%\t90%\t95%\t99%\n====================================================="
+echo "$TOT_SRT" | awk -v avg=$TOT_AVG -v std=$TOT_STD '{ all[NR] = $0 } END { printf "%0.2f\t%0.2f\t%d\t%d\t%d\t%d\t%d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+echo "$QUE_SRT" | awk -v avg=$QUE_AVG -v std=$QUE_STD '{ all[NR] = $0 } END { printf "%0.2f\t%0.2f\t%d\t%d\t%d\t%d\t%d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+echo "$SRV_SRT" | awk -v avg=$SRV_AVG -v std=$SRV_STD '{ all[NR] = $0 } END { printf "%0.2f\t%0.2f\t%d\t%d\t%d\t%d\t%d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+#echo "$TOT_SRT" | awk -v avg=$TOT_AVG -v std=$TOT_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+#echo "$QUE_SRT" | awk -v avg=$QUE_AVG -v std=$QUE_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+#echo "$SRV_SRT" | awk -v avg=$SRV_AVG -v std=$SRV_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+
+# Plot sorted timings
+mkdir -p $PLOTDIR
+echo "$(paste <(echo "$(seq 0 $(echo 100 $CNT | awk '{print $1 / $2}') 100)") <(echo "$TOT_SRT") <(echo "$QUE_SRT") <(echo "$SRV_SRT"))" > $DATAFILE
+gnuplot -p <<- EOF
+    set terminal postscript eps color 'Times-Roman,$FONTSZ'
+    set output '| epstopdf --filter --outfile=$PLOTDIR/perc_all.pdf'
+    set xlabel 'Percentile (%)'
+    set ylabel 'Time ({/Symbol m}s)'
+    set xtics 0,10,100
+    set xrange [0:100]
+    set yrange [0:$MAXT]
+    set arrow from 50, graph 0 to 50, graph 1 nohead lw 0.5
+    set arrow from 80, graph 0 to 80, graph 1 nohead lw 0.5
+    set arrow from 90, graph 0 to 90, graph 1 nohead lw 0.5
+    set arrow from 95, graph 0 to 95, graph 1 nohead lw 0.5
+    set arrow from 99, graph 0 to 99, graph 1 nohead lw 0.5
+    set key l
+    plot '$DATAFILE' u 1:2 w lines lw 3 title 'Total', \
+        '' u 1:3 w lines lw 2 title 'Queue', \
+        '' u 1:4 w lines lw 2 title 'Server'
+EOF
+
+# Plot empirical distribution of total time.
+gnuplot -p <<- EOF
+    set terminal postscript eps color 'Times-Roman,$FONTSZ'
+    set output '| epstopdf --filter --outfile=$PLOTDIR/dist_tot.pdf'
+    set xlabel 'Time ({/Symbol m}s)'
+    set ylabel 'Number of requests'
+    width = $MAXT / $INT
+    hist(x, width) = width * floor(x / width) + width / 2.0
+    set xrange [0:$MAXT]
+    set yrange [0:$MAXR]
+    set boxwidth width * $WIDTH
+    set style fill solid $OPAC
+    plot '$DATAFILE' u (hist(\$2,width)):(1.0) smooth freq w boxes lt 1 notitle
+EOF
+
+# Plot empirical distribution of queue time.
+gnuplot -p <<- EOF
+    set terminal postscript eps color 'Times-Roman,$FONTSZ'
+    set output '| epstopdf --filter --outfile=$PLOTDIR/dist_que.pdf'
+    set xlabel 'Time ({/Symbol m}s)'
+    set ylabel 'Number of requests'
+    width = $MAXT / $INT
+    hist(x, width) = width * floor(x / width) + width / 2.0
+    set xrange [0:$MAXT]
+    set yrange [0:$MAXR]
+    set boxwidth width * $WIDTH
+    set style fill solid $OPAC
+    plot '$DATAFILE' u (hist(\$3,width)):(1.0) smooth freq w boxes lt 2 notitle
+EOF
+
+# Plot empirical distribution of server time.
+gnuplot -p <<- EOF
+    set terminal postscript eps color 'Times-Roman,$FONTSZ'
+    set output '| epstopdf --filter --outfile=$PLOTDIR/dist_srv.pdf'
+    set xlabel 'Time ({/Symbol m}s)'
+    set ylabel 'Number of requests'
+    width = $MAXT / $INT
+    hist(x, width) = width * floor(x / width) + width / 2.0
+    set xrange [0:$MAXT]
+    set yrange [0:$MAXR]
+    set boxwidth width * $WIDTH
+    set style fill solid $OPAC
+    plot '$DATAFILE' u (hist(\$4, width)):(1.0) smooth freq w boxes lt 3 notitle
+EOF
+
+#sleep 0.5
+#llpp $PLOTDIR/perc_all.pdf &
+#llpp $PLOTDIR/dist_tot.pdf &
+#llpp $PLOTDIR/dist_que.pdf &
+#llpp $PLOTDIR/dist_srv.pdf &

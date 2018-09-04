@@ -1,0 +1,171 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/experiments/01_memcached_baselines
+
+# Connections - put the one you want BELOW the other.
+
+#################################### LOCAL ####################################
+EXPERIMENT=LOCAL_01_memcached_baselines
+USER=fabio
+CLIENT1_IP=localhost
+CLIENT2_IP=localhost
+SERVER_IP=localhost
+SERVER_IP_PRIV=localhost
+###############################################################################
+
+#################################### REMOTE ###################################
+EXPERIMENT=01_memcached_baselines
+USER=fbanfi
+CLIENT1_IP=fbanfiforaslvms10.westeurope.cloudapp.azure.com
+CLIENT2_IP=fbanfiforaslvms2.westeurope.cloudapp.azure.com
+SERVER_IP=fbanfiforaslvms1.westeurope.cloudapp.azure.com
+SERVER_IP_PRIV=10.0.0.13
+###############################################################################
+
+# Settings.
+SERVER_PORT=11212
+MEMASLAP=libmemcached-1.0.18/clients/memaslap
+LOGDIR_ROOT=log/experiments
+CONFIG=smallvalue.cfg
+RUNTIME=30s
+REPETITIONS=5
+STEP=2
+DELAY=5
+
+# Constants and macros.
+SSH="ssh -oStrictHostKeyChecking=no"
+SCP="scp -oStrictHostKeyChecking=no"
+EXPERIMENT=$EXPERIMENT'_'$(date +%y-%m-%d_%H:%M:%S)
+TIME_UNIT=$(echo -n $RUNTIME | tail -c 1)
+if [ $TIME_UNIT = s ]; then SERVER_TIME=$(echo ${RUNTIME%s})
+elif [ $TIME_UNIT = m ]; then SERVER_TIME=$(($(echo ${RUNTIME%m}) * 60))
+else SERVER_TIME=$(($(echo ${RUNTIME%h}) * 3600)); fi
+SERVER_TIME=$(($SERVER_TIME + 2 * $DELAY))
+WAIT_TIME=$SERVER_TIME
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+
+# Accept new public keys.
+echo -e "Warming up remote machines . . . $PAD"
+grep -v azure ~/.ssh/known_hosts > known_hosts.temp; cat known_hosts.temp > ~/.ssh/known_hosts; rm known_hosts.temp
+$SSH $USER@$CLIENT1_IP "ls > /dev/null"
+$SSH $USER@$CLIENT2_IP "ls > /dev/null"
+$SSH $USER@$SERVER_IP "ls > /dev/null"
+echo -e $OK
+
+# Set and create log folder on remote clients.
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+$SSH $USER@$CLIENT1_IP "mkdir -p $LOGDIR"
+$SSH $USER@$CLIENT2_IP "mkdir -p $LOGDIR"
+
+# Run each client 60 / $STEP times with different number of threads.
+for T in $(seq $STEP $STEP 64)
+do
+    # For $T threads, repeat the experiment $REPETITIONS times.
+    for R in $(seq 1 $REPETITIONS)
+    do
+        echo "===================[ Repetition $R/$REPETITIONS ]==================="
+
+        echo -e "Starting server for $SERVER_TIME seconds . . . $PAD"
+        $SSH $USER@$SERVER_IP "memcached -p $SERVER_PORT -t 1 & sleep $SERVER_TIME; kill -TERM %1" &
+        sleep $DELAY
+        echo -e $OK
+
+        # Set log files names.
+        LOGFILE1=$LOGDIR/client1_$(e $T)-$R.log
+        LOGFILE2=$LOGDIR/client2_$(e $T)-$R.log
+
+        # Start the clients with $T threads each and save logs files on remote.
+        CMD1="$MEMASLAP -s$SERVER_IP_PRIV:$SERVER_PORT -T$T -c$T -o0.9 -S1s -t$RUNTIME -Fconfig/$CONFIG >> $LOGFILE1 &"
+        CMD2="$MEMASLAP -s$SERVER_IP_PRIV:$SERVER_PORT -T$T -c$T -o0.9 -S1s -t$RUNTIME -Fconfig/$CONFIG >> $LOGFILE2 &"
+        echo -e "Starting client 1 on $T threads . . . $PAD"
+        $SSH $USER@$CLIENT1_IP $CMD1 &
+        echo -e $OK
+        echo -e "Starting client 2 on $T threads . . . $PAD"
+        $SSH $USER@$CLIENT2_IP $CMD2 &
+        echo -e $OK
+
+        echo -e "Waiting for server and clients to terminate . . . $PAD"
+        sleep $WAIT_TIME
+        echo -e $OK
+
+        echo -e "Extracting data from clients' logs . . . $PAD"
+
+        # Copy logs from remote.
+        mkdir -p $LOGDIR
+        $SCP $USER@$CLIENT1_IP:$LOGFILE1 $LOGFILE1 > /dev/null
+        $SCP $USER@$CLIENT2_IP:$LOGFILE2 $LOGFILE2 > /dev/null
+
+        # Read client 1 data.
+        TPS1=$(tail -n 1 $LOGFILE1 | awk '{print $7}')
+        AVG1=$(cat $LOGFILE1 | grep Avg | tail -n 1 | awk '{print $2}')
+        STD1=$(cat $LOGFILE1 | grep Std | tail -n 1 | awk '{print $2}')
+
+        # Read client 2 data.
+        TPS2=$(tail -n 1 $LOGFILE2 | awk '{print $7}')
+        AVG2=$(cat $LOGFILE2 | grep Avg | tail -n 1 | awk '{print $2}')
+        STD2=$(cat $LOGFILE2 | grep Std | tail -n 1 | awk '{print $2}')
+
+        # Memorize TPS, AVG, and STD of this run.
+        TPSs="$TPSs $(echo $TPS1 $TPS2 | awk '{print $1 + $2}')"
+        AVGs="$AVGs $(echo $AVG1 $AVG2 | awk '{print ($1 + $2) / 2}')"
+        STDs="$STDs $(echo $STD1 $STD2 | awk '{print ($1 + $2) / 2}')"
+
+        echo -e $OK
+    done
+
+    echo -e "Aggregating clients' data for $T threads . . . $PAD"
+    for tps in $TPSs; do TPS=$(echo $TPS $tps | awk '{print $1 + $2}'); done; TPS=$(echo $TPS $REPETITIONS | awk '{print $1 / $2}')
+    for avg in $AVGs; do AVG=$(echo $AVG $avg | awk '{print $1 + $2}'); done; AVG=$(echo $AVG $REPETITIONS | awk '{print $1 / $2}')
+    for std in $STDs; do STD=$(echo $STD $std | awk '{print $1 + $2}'); done; STD=$(echo $STD $REPETITIONS | awk '{print $1 / $2}')
+    TT=$(($T * 2))
+    OUT1=$LOGDIR/tps.data
+    OUT2=$LOGDIR/rt.data
+    echo "$TT $TPS" >> $OUT1
+    echo "$TT $AVG $STD" >> $OUT2
+    echo -e $OK
+
+    # Reset variables.
+    TPSs=
+    AVGs=
+    STDs=
+    TPS=
+    AVG=
+    STD=
+done
+
+echo "========================================================"
+echo -e "Compressing logs and data . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo "========================================================"
+echo -e "Plotting data . . . $PAD"
+cd $EXPERIMENT
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=tps.pdf'
+    set xlabel 'Number of virtual clients'
+    set ylabel 'Throughput (requests/s)'
+    set xtics 8,8,128
+    set xrange [0:136]
+    set yrange [0:]
+    unset key
+    plot 'tps.data' with linespoints pt 13 lc rgb '0x3366FF'
+EOF
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=rt.pdf'
+    set xlabel 'Number of virtual clients'
+    set ylabel 'Response time ({/Symbol m}s)'
+    set xtics 8,8,128
+    set xzeroaxis
+    set xrange [0:136]
+    unset key
+    plot 'rt.data' w errorbars lc rgb '0x77AAFF', '' u 1:2 pt 13 ps 1.2 lc rgb '0x3366FF'
+EOF
+echo -e $OK
+
+echo "========================================================"
+echo "Experiment '$EXPERIMENT' terminated!"

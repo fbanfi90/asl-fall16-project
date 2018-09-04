@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analyses/m3; ./5_interactive_law
+
+LOGDIR=../../../log/experiments/04_replication_effect_16-11-20_13:16:14
+REPETITIONS=4
+RUNTIME=50
+WARMUP=10
+STABLE_PHASE=30
+PLOTDIR=plots
+OUTFILE=5_interactive_law
+RS=(None Half Full)
+FONTSZ=20
+Z=0
+
+for S in $(seq 3 2 7)
+do
+    i=0
+    OUT=$OUTFILE'_'$S
+    rm -f $OUT.data
+    for R in {1,$((($S + 1) / 2)),$S}
+    do
+        TPS_AVG_R=
+        TPS_STD_R=
+        RT_AVG_R=
+        for r in $(seq 1 $REPETITIONS)
+        do
+            TPS_AVG_C=
+            TPS_STD_C=
+            RT_AVG_C=
+            for c in $(seq 3)
+            do
+                TPS=$(cat $LOGDIR/client$c'_'S$S'_'R$R'_'r$r.log | grep -A 2 "Total Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{print $4}')
+                TPS_AVG=$(echo "$TPS" | awk '{ x += $1 } END { print x / NR; }')
+                TPS_AVG_C=$(echo -e "$TPS_AVG_C\n$TPS_AVG")
+                TPS_STD=$(echo "$TPS" | awk -v avg=$TPS_AVG '{ x += ($1 - avg) ^ 2 } END { print x / (NR - 1) }')
+                TPS_STD_C=$(echo -e "$TPS_STD_C\n$TPS_STD")
+                RT=$(cat $LOGDIR/client$c'_'S$S'_'R$R'_'r$r.log | grep -A 2 "Total Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{print $9}')
+                RT_AVG=$(echo "$RT" | awk '{ x += $1 } END { print x / NR; }')
+                RT_AVG_C=$(echo -e "$RT_AVG_C\n$RT_AVG")
+            done
+            TPS_AVG_R=$(echo -e "$TPS_AVG_R\n$(echo "$TPS_AVG_C" | tail -n +2 | awk '{ x += $1 } END { print x; }')")
+            TPS_STD_R=$(echo -e "$TPS_STD_R\n$(echo "$TPS_STD_C" | tail -n +2 | awk '{ x += $1 } END { print sqrt(x) }')")
+            RT_AVG_R=$(echo -e "$RT_AVG_R\n$(echo "$RT_AVG_C" | tail -n +2 | awk '{ x += $1 } END { print x / 3000000; }')")
+        done
+        TPS_AVG=$(echo "$TPS_AVG_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR; }')
+        TPS_STD=$(echo "$TPS_STD_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR; }')
+        RT_AVG=$(echo "$RT_AVG_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR; }')
+        TPS_EXP=$(echo $RT_AVG | awk -v Z=$Z '{ print (3 * 70) / ($1 + Z) }')
+        RATIO=$(echo $TPS_EXP $TPS_AVG | awk '{ print $1 / $2 }')
+        echo "${RS[$i]} $TPS_AVG $TPS_STD $TPS_EXP 0 $RATIO" >> $OUT.data
+        i=$(($i + 1))
+    done
+    mkdir -p $PLOTDIR
+    gnuplot -p << EOF
+        set terminal postscript eps color 'Times-Roman,$FONTSZ'
+        set output '| epstopdf --filter --outfile=$PLOTDIR/$OUT.pdf'
+        set xlabel 'Replication'
+        set ylabel 'Throughput (requests/s)'
+        set yrange [0:25000]
+        set style data histogram
+        set style fill solid border
+        set style fill solid 0.3
+        set bars front
+        set style histogram clustered errorbars linewidth 1.5
+        plot '$OUT.data' using 2:3:xticlabels(1) lc rgb '#268bd2' title 'Measured', \
+            '' using 4:5:xticlabels(1) lc rgb '#2aa198' title 'Expected'
+EOF
+    #sleep 0.5
+    #llpp $PLOTDIR/$OUT.pdf &
+done

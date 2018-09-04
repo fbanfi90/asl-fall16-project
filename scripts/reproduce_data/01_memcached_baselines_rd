@@ -1,0 +1,106 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/reproduce_data/01_memcached_baselines_rd experiment_name
+# NOTE: experiment_name is assumed to be located in directory $LOGDIR_ROOT/
+#       Also make sure to set $STEP and $REPETITIONS *exactly* as in the original experiment!
+
+# Constants and macros.
+EXPERIMENT=$@
+LOGDIR_ROOT=log/experiments
+STEP=2
+REPETITIONS=5
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+
+echo -e "Removing old data . . . $PAD"
+rm $LOGDIR.zip $LOGDIR/tps.* $LOGDIR/rt.*
+echo -e $OK
+
+# Run each client 60 / $STEP times with different number of threads.
+for T in $(seq $STEP $STEP 64)
+do
+    # For $T threads, repeat the experiment $REPETITIONS times.
+    for R in $(seq 1 $REPETITIONS)
+    do
+        echo "===================[ Repetition $R/$REPETITIONS ]==================="
+
+        # Set log files names.
+        LOGFILE1=$LOGDIR/client1_$(e $T)-$R.log
+        LOGFILE2=$LOGDIR/client2_$(e $T)-$R.log
+
+        echo -e "Extracting data from clients' logs . . . $PAD"
+
+        # Read client 1 data.
+        TPS1=$(tail -n 1 $LOGFILE1 | awk '{print $7}')
+        AVG1=$(cat $LOGFILE1 | grep Avg | tail -n 1 | awk '{print $2}')
+        STD1=$(cat $LOGFILE1 | grep Std | tail -n 1 | awk '{print $2}')
+
+        # Read client 2 data.
+        TPS2=$(tail -n 1 $LOGFILE2 | awk '{print $7}')
+        AVG2=$(cat $LOGFILE2 | grep Avg | tail -n 1 | awk '{print $2}')
+        STD2=$(cat $LOGFILE2 | grep Std | tail -n 1 | awk '{print $2}')
+
+        # Memorize TPS, AVG, and STD of this run.
+        TPSs="$TPSs $(echo $TPS1 $TPS2 | awk '{print $1 + $2}')"
+        AVGs="$AVGs $(echo $AVG1 $AVG2 | awk '{print ($1 + $2) / 2}')"
+        STDs="$STDs $(echo $STD1 $STD2 | awk '{print ($1 + $2) / 2}')"
+
+        echo -e $OK
+    done
+
+    echo -e "Aggregating clients' data for $T threads . . . $PAD"
+    for tps in $TPSs; do TPS=$(echo $TPS $tps | awk '{print $1 + $2}'); done; TPS=$(echo $TPS $REPETITIONS | awk '{print $1 / $2}')
+    for avg in $AVGs; do AVG=$(echo $AVG $avg | awk '{print $1 + $2}'); done; AVG=$(echo $AVG $REPETITIONS | awk '{print $1 / $2}')
+    for std in $STDs; do STD=$(echo $STD $std | awk '{print $1 + $2}'); done; STD=$(echo $STD $REPETITIONS | awk '{print $1 / $2}')
+    TT=$(($T * 2))
+    OUT1=$LOGDIR/tps.data
+    OUT2=$LOGDIR/rt.data
+    echo "$TT $TPS" >> $OUT1
+    echo "$TT $AVG $STD" >> $OUT2
+    echo -e $OK
+
+    # Reset variables.
+    TPSs=
+    AVGs=
+    STDs=
+    TPS=
+    AVG=
+    STD=
+done
+
+echo "========================================================"
+echo -e "Compressing logs and data . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo "========================================================"
+echo -e "Plotting data . . . $PAD"
+cd $EXPERIMENT
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=tps.pdf'
+    set xlabel 'Number of virtual clients'
+    set ylabel 'Throughput (requests/s)'
+    set xtics 8,8,128
+    set xrange [0:136]
+    set yrange [0:]
+    unset key
+    plot 'tps.data' with linespoints pt 13 lc rgb '0x3366FF'
+EOF
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=rt.pdf'
+    set xlabel 'Number of virtual clients'
+    set ylabel 'Response time ({/Symbol m}s)'
+    set xtics 8,8,128
+    set xzeroaxis
+    set xrange [0:136]
+    unset key
+    plot 'rt.data' w errorbars lc rgb '0x77AAFF', '' u 1:2 pt 13 ps 1.2 lc rgb '0x3366FF'
+EOF
+echo -e $OK
+
+echo "========================================================"
+echo "Data for experiment '$EXPERIMENT' reproduced!"

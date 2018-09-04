@@ -1,0 +1,350 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/experiments/03_maximum_throughput
+
+# Connections - put the one you want BELOW the other.
+
+#################################### LOCAL ####################################
+EXPERIMENT=LOCAL_03_maximum_throughput
+USER=fabio
+CLIENT1_IP=127.0.0.1
+CLIENT2_IP=127.0.0.1
+CLIENT3_IP=127.0.0.1
+CLIENT4_IP=127.0.0.1
+CLIENT5_IP=127.0.0.1
+SERVER1_IP=127.0.0.1
+SERVER2_IP=127.0.0.1
+SERVER3_IP=127.0.0.1
+SERVER4_IP=127.0.0.1
+SERVER5_IP=127.0.0.1
+SERVER1_IP_PRIV=127.0.0.1
+SERVER2_IP_PRIV=127.0.0.1
+SERVER3_IP_PRIV=127.0.0.1
+SERVER4_IP_PRIV=127.0.0.1
+SERVER5_IP_PRIV=127.0.0.1
+SERVER1_PORT=11212
+SERVER2_PORT=11213
+SERVER3_PORT=11214
+SERVER4_PORT=11215
+SERVER5_PORT=11216
+MIDDLEWARE_IP=127.0.0.1
+MIDDLEWARE_IP_PRIV=127.0.0.1
+MIDDLEWARE_PORT=11211
+###############################################################################
+
+#################################### REMOTE ###################################
+EXPERIMENT=03_maximum_throughput
+USER=fbanfi
+CLIENT1_IP=fbanfiforaslvms2.westeurope.cloudapp.azure.com
+CLIENT2_IP=fbanfiforaslvms3.westeurope.cloudapp.azure.com
+CLIENT3_IP=fbanfiforaslvms8.westeurope.cloudapp.azure.com
+CLIENT4_IP=fbanfiforaslvms9.westeurope.cloudapp.azure.com
+CLIENT5_IP=fbanfiforaslvms10.westeurope.cloudapp.azure.com
+SERVER1_IP=fbanfiforaslvms1.westeurope.cloudapp.azure.com
+SERVER2_IP=fbanfiforaslvms4.westeurope.cloudapp.azure.com
+SERVER3_IP=fbanfiforaslvms5.westeurope.cloudapp.azure.com
+SERVER4_IP=fbanfiforaslvms6.westeurope.cloudapp.azure.com
+SERVER5_IP=fbanfiforaslvms7.westeurope.cloudapp.azure.com
+SERVER1_IP_PRIV=10.0.0.13
+SERVER2_IP_PRIV=10.0.0.12
+SERVER3_IP_PRIV=10.0.0.11
+SERVER4_IP_PRIV=10.0.0.7
+SERVER5_IP_PRIV=10.0.0.14
+SERVER1_PORT=11212
+SERVER2_PORT=11212
+SERVER3_PORT=11212
+SERVER4_PORT=11212
+SERVER5_PORT=11212
+MIDDLEWARE_IP=fbanfiforaslvms11.westeurope.cloudapp.azure.com
+MIDDLEWARE_IP_PRIV=10.0.0.9
+MIDDLEWARE_PORT=11211
+###############################################################################
+
+# Runs - put the one you want BELOW the others.
+
+#################################### RUN 1 ####################################
+MINC=10
+STPC=20
+MAXC=90
+MINT=8
+STPT=8
+MAXT=40
+###############################################################################
+
+#################################### RUN 2 ####################################
+MINC=10
+STPC=10
+MAXC=70
+MINT=16
+STPT=8
+MAXT=32
+###############################################################################
+
+#################################### RUN 3 ####################################
+MINC=40
+STPC=4
+MAXC=60
+MINT=16
+STPT=8
+MAXT=24
+###############################################################################
+
+# Settings.
+MIDDLEWARE=middleware-fbanfi.jar
+MEMASLAP=libmemcached-1.0.18/clients/memaslap
+LOGDIR_ROOT=log/experiments
+CONGIGDIR_ROOT=config
+CONFIG=readonly.cfg
+REPETITIONS=4
+REPLICATION=1
+RUNTIME=90s
+DELAY=5
+
+# Constants and macros.
+SSH="ssh -oStrictHostKeyChecking=no"
+SCP="scp -oStrictHostKeyChecking=no"
+EXPERIMENT=$EXPERIMENT'_'$(date +%y-%m-%d_%H:%M:%S)
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+function ee { if (($1 < 10)); then echo "00$1"; elif (($1 < 100)); then echo "0$1"; else echo $1; fi }
+
+# Accept new public keys.
+echo -e "Warming up remote machines . . . $PAD"
+grep -v azure ~/.ssh/known_hosts > known_hosts.temp; cat known_hosts.temp > ~/.ssh/known_hosts; rm known_hosts.temp
+$SSH $USER@$CLIENT1_IP "ls > /dev/null"
+$SSH $USER@$CLIENT2_IP "ls > /dev/null"
+$SSH $USER@$CLIENT3_IP "ls > /dev/null"
+$SSH $USER@$CLIENT4_IP "ls > /dev/null"
+$SSH $USER@$CLIENT5_IP "ls > /dev/null"
+$SSH $USER@$SERVER1_IP "ls > /dev/null"
+$SSH $USER@$SERVER2_IP "ls > /dev/null"
+$SSH $USER@$SERVER3_IP "ls > /dev/null"
+$SSH $USER@$SERVER4_IP "ls > /dev/null"
+$SSH $USER@$SERVER5_IP "ls > /dev/null"
+$SSH $USER@$MIDDLEWARE_IP "ls > /dev/null"
+echo -e $OK
+
+# Update middleware.
+echo -e "Updating middleware . . . $PAD"
+$SCP dist/$MIDDLEWARE $USER@$MIDDLEWARE_IP:~ > /dev/null
+echo -e $OK
+
+# Set and create log folder on remote clients.
+echo -e "Preparing clients and middleware . . . $PAD"
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+$SSH $USER@$CLIENT1_IP "mkdir -p $LOGDIR $CONGIGDIR_ROOT"
+$SSH $USER@$CLIENT2_IP "mkdir -p $LOGDIR $CONGIGDIR_ROOT"
+$SSH $USER@$CLIENT3_IP "mkdir -p $LOGDIR $CONGIGDIR_ROOT"
+$SSH $USER@$CLIENT4_IP "mkdir -p $LOGDIR $CONGIGDIR_ROOT"
+$SSH $USER@$CLIENT5_IP "mkdir -p $LOGDIR $CONGIGDIR_ROOT"
+$SCP $CONGIGDIR_ROOT/$CONFIG $USER@$CLIENT1_IP:$CONGIGDIR_ROOT/$CONFIG > /dev/null
+$SCP $CONGIGDIR_ROOT/$CONFIG $USER@$CLIENT2_IP:$CONGIGDIR_ROOT/$CONFIG > /dev/null
+$SCP $CONGIGDIR_ROOT/$CONFIG $USER@$CLIENT3_IP:$CONGIGDIR_ROOT/$CONFIG > /dev/null
+$SCP $CONGIGDIR_ROOT/$CONFIG $USER@$CLIENT4_IP:$CONGIGDIR_ROOT/$CONFIG > /dev/null
+$SCP $CONGIGDIR_ROOT/$CONFIG $USER@$CLIENT5_IP:$CONGIGDIR_ROOT/$CONFIG > /dev/null
+$SSH $USER@$MIDDLEWARE_IP "mkdir -p $LOGDIR"
+echo -e $OK
+
+# Create log folder on local.
+mkdir -p $LOGDIR
+OUT=$LOGDIR/tps.data
+
+# Variate number of virtual clients.
+for C in $(seq $MINC $STPC $MAXC)
+do
+    CC=$(($C * 5))
+    echo -n "$CC " >> $OUT
+
+    # Variate number of threads in thread pool of middleware.
+    for T in $(seq $MINT $STPT $MAXT)
+    do
+        # Repeat the experiment.
+        for R in $(seq 1 $REPETITIONS)
+        do
+            echo -e "===========[ C: $((5 * $C))/$((5 * $MAXC)) | T: $T/$MAXT | R: $R/$REPETITIONS ]=============\033[57G    "
+
+            echo -e "Starting server 1 . . . $PAD"
+            $SSH $USER@$SERVER1_IP "memcached -p $SERVER1_PORT -t 1 &" &
+            echo -e $OK
+
+            echo -e "Starting server 2 . . . $PAD"
+            $SSH $USER@$SERVER2_IP "memcached -p $SERVER2_PORT -t 1 &" &
+            echo -e $OK
+
+            echo -e "Starting server 3 . . . $PAD"
+            $SSH $USER@$SERVER3_IP "memcached -p $SERVER3_PORT -t 1 &" &
+            echo -e $OK
+
+            echo -e "Starting server 4 . . . $PAD"
+            $SSH $USER@$SERVER4_IP "memcached -p $SERVER4_PORT -t 1 &" &
+            echo -e $OK
+
+            echo -e "Starting server 5 . . . $PAD"
+            $SSH $USER@$SERVER5_IP "memcached -p $SERVER5_PORT -t 1 &" &
+            echo -e $OK
+
+            echo -e "Waiting for servers to be operative . . . $PAD"
+            sleep $DELAY
+            echo -e $OK
+
+            echo -e "Starting middleware . . . $PAD"
+            $SSH $USER@$MIDDLEWARE_IP "java -jar $MIDDLEWARE -l $MIDDLEWARE_IP_PRIV -p $MIDDLEWARE_PORT -t $T -r $REPLICATION -m $SERVER1_IP_PRIV:$SERVER1_PORT $SERVER2_IP_PRIV:$SERVER2_PORT $SERVER3_IP_PRIV:$SERVER3_PORT $SERVER4_IP_PRIV:$SERVER4_PORT $SERVER5_IP_PRIV:$SERVER5_PORT" &
+            echo -e $OK
+
+            echo -e "Waiting for middleware to be operative . . . $PAD"
+            sleep $DELAY
+            echo -e $OK
+
+            # Set log files names.
+            LOGFILE1=$LOGDIR/client1_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE2=$LOGDIR/client2_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE3=$LOGDIR/client3_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE4=$LOGDIR/client4_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE5=$LOGDIR/client5_C$(ee $C)_T$(e $T)_R$(e $R).log
+
+            # Set memaslap command.
+            CMD="$MEMASLAP -s$MIDDLEWARE_IP_PRIV:$MIDDLEWARE_PORT -T$C -c$C -o0.9 -w1k -S1s -t$RUNTIME -F$CONGIGDIR_ROOT/$CONFIG >> "
+            PIDs=""
+
+            echo -e "Starting client 1 . . . $PAD"
+            $SSH $USER@$CLIENT1_IP "$CMD $LOGFILE1" & PIDs="$PIDs $!"
+            echo -e $OK
+
+            echo -e "Starting client 2 . . . $PAD"
+            $SSH $USER@$CLIENT2_IP "$CMD $LOGFILE2" & PIDs="$PIDs $!"
+            echo -e $OK
+
+            echo -e "Starting client 3 . . . $PAD"
+            $SSH $USER@$CLIENT3_IP "$CMD $LOGFILE3" & PIDs="$PIDs $!"
+            echo -e $OK
+
+            echo -e "Starting client 4 . . . $PAD"
+            $SSH $USER@$CLIENT4_IP "$CMD $LOGFILE4" & PIDs="$PIDs $!"
+            echo -e $OK
+
+            echo -e "Starting client 5 . . . $PAD"
+            $SSH $USER@$CLIENT5_IP "$CMD $LOGFILE5" & PIDs="$PIDs $!"
+            echo -e $OK
+
+            echo -e "Waiting for clients to terminate . . . $PAD"
+            for PID in $PIDs; do wait $PID; done
+            echo -e $OK
+
+            echo -e "Shutting down middleware . . . $PAD"
+            $SSH $USER@$MIDDLEWARE_IP "pkill java"
+            echo -e $OK
+
+            echo -e "Shutting down servers . . . $PAD"
+            $SSH $USER@$CLIENT1_IP "pkill memcached"
+            $SSH $USER@$CLIENT2_IP "pkill memcached"
+            $SSH $USER@$CLIENT3_IP "pkill memcached"
+            $SSH $USER@$CLIENT4_IP "pkill memcached"
+            $SSH $USER@$CLIENT5_IP "pkill memcached"
+            echo -e $OK
+
+            echo -e "Extracting data from clients' logs . . . $PAD"
+
+            # Copy logs from remote.
+            $SCP $USER@$CLIENT1_IP:$LOGFILE1 $LOGFILE1 > /dev/null
+            $SCP $USER@$CLIENT2_IP:$LOGFILE2 $LOGFILE2 > /dev/null
+            $SCP $USER@$CLIENT3_IP:$LOGFILE3 $LOGFILE3 > /dev/null
+            $SCP $USER@$CLIENT4_IP:$LOGFILE4 $LOGFILE4 > /dev/null
+            $SCP $USER@$CLIENT5_IP:$LOGFILE5 $LOGFILE5 > /dev/null
+
+            # Read clients data.
+            TPS1=$(cat $LOGFILE1 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS1_AVG=$(echo $TPS1 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS1_STD=$(echo $TPS1 | awk -v avg="$TPS1_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS2=$(cat $LOGFILE2 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS2_AVG=$(echo $TPS2 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS2_STD=$(echo $TPS2 | awk -v avg="$TPS2_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS3=$(cat $LOGFILE3 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS3_AVG=$(echo $TPS3 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS3_STD=$(echo $TPS3 | awk -v avg="$TPS3_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS4=$(cat $LOGFILE4 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS4_AVG=$(echo $TPS4 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS4_STD=$(echo $TPS4 | awk -v avg="$TPS4_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS5=$(cat $LOGFILE5 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS5_AVG=$(echo $TPS5 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS5_STD=$(echo $TPS5 | awk -v avg="$TPS5_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+
+            # Memorize TPS's AVG and STD of this run.
+            TPS_AVGs="$TPS_AVGs $(echo $TPS1_AVG $TPS2_AVG $TPS3_AVG $TPS4_AVG $TPS5_AVG | awk '{print $1 + $2 + $3 + $4 + $5}')"
+            TPS_STDs="$TPS_STDs $(echo $TPS1_STD $TPS2_STD $TPS3_STD $TPS4_STD $TPS5_STD | awk '{print sqrt($1 + $2 + $3 + $4 + $5)}')"
+
+            echo -e $OK
+
+            echo -e "Saving middleware's log file . . . $PAD"
+            MW_LOGFILE=$LOGDIR/middleware_C$(ee $C)_T$(e $T)_R$(e $R).log
+            $SSH $USER@$MIDDLEWARE_IP "cp \$(ls log/mw_* | tail -n 1) $MW_LOGFILE"
+            $SCP $USER@$MIDDLEWARE_IP:$MW_LOGFILE $MW_LOGFILE > /dev/null
+            echo -e $OK
+        done
+
+        echo -e "Aggregating clients' data . . . $PAD"
+        TPS_AVG=$(echo $TPS_AVGs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+        TPS_STD=$(echo $TPS_STDs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+        echo -n "$TPS_AVG $TPS_STD " >> $OUT
+        echo -e $OK
+
+        # Reset variables.
+        TPS_AVGs=
+        TPS_STDs=
+    done
+    echo "" >> $OUT
+done
+
+echo "========================================================"
+echo -e "Compressing logs and data . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo "========================================================"
+echo -e "Plotting data . . . $PAD"
+cd $EXPERIMENT
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=tps.pdf'
+    set xlabel 'Number of virtual clients'
+    set ylabel 'Throughput (requests/s)'
+#    set xtics 50,100,450
+#    set xrange [0:500]
+#    set xtics 50,50,350
+#    set xrange [0:400]
+    set xtics 200,20,300
+    set xrange [180:320]
+    set yrange [0:]
+    set key c c title 'Threads'
+#    plot 'tps.data' u 1:2:3 w errorbars pt 13 lt 1 title '8', \
+#        '' u 1:2 w lines lt 1 notitle, \
+#        '' u 1:4:5 w errorbars pt 13 lt 2 title '16', \
+#        '' u 1:4 w lines lt 2 notitle, \
+#        '' u 1:6:7 w errorbars pt 13 lt 3 title '24', \
+#        '' u 1:6 w lines lt 3 notitle, \
+#        '' u 1:8:9 w errorbars pt 13 lt 4 title '32', \
+#        '' u 1:8 w lines lt 4 notitle, \
+#        '' u 1:10:11 w errorbars pt 13 lt 5 title '40', \
+#        '' u 1:10 w lines lt 5 notitle
+#    plot 'tps.data' u 1:2:3 w errorbars pt 13 lt 2 title '16', \
+#        '' u 1:2 w lines lt 2 notitle, \
+#        '' u 1:4:5 w errorbars pt 13 lt 3 title '24', \
+#        '' u 1:4 w lines lt 3 notitle, \
+#        '' u 1:6:7 w errorbars pt 13 lt 4 title '32', \
+#        '' u 1:6 w lines lt 4 notitle
+    plot 'tps.data' u 1:2:3 w errorbars pt 13 lt 2 title '16', \
+        '' u 1:2 w lines lt 2 notitle, \
+        '' u 1:4:5 w errorbars pt 13 lt 3 title '24', \
+        '' u 1:4 w lines lt 3 notitle
+EOF
+echo -e $OK
+
+echo "========================================================"
+echo "Experiment '$EXPERIMENT' terminated!"
+
+
+
+
+
+
+# ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms1.westeurope.cloudapp.azure.com "memcached -p 11212 -t 1" & sleep 5; ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms11.westeurope.cloudapp.azure.com "java -jar middleware-fbanfi.jar -l 10.0.0.9 -p 11211 -t 16 -r 1 -m 10.0.0.13:11212" & sleep 5; ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms10.westeurope.cloudapp.azure.com "./libmemcached-1.0.18/clients/memaslap -s10.0.0.9:11211 -T64 -c64 -o0.9 -w1k -S1s -t1m -Fconfig/readonly.cfg > OUT" & PID=$!; wait $PID; ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms11.westeurope.cloudapp.azure.com "pkill java"; ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms1.westeurope.cloudapp.azure.com "pkill memcached"

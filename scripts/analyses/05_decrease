@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./04_descrease
+# (Assumes '04_clients_Set.data' and '04_clients_Get.data' exist, from '04_clients'.)
+
+TP1=05_clients_TPS_one.data
+TPS=05_clients_TPS_full.data
+RT1=05_clients_RT_one.data
+RTS=05_clients_RT_full.data
+
+echo -e "5%\t10%\t5%\t10%\t5%\t10%\n============================================="
+cat "$TP1" | awk '{ printf "%0.2f%\t%0.2f%\t", 100 * (1 - $4 / $2), 100 * (1 - $6 / $2) } END { printf "\n" }'
+cat "$TPS" | awk '{ printf "%0.2f%\t%0.2f%\t", 100 * (1 - $4 / $2), 100 * (1 - $6 / $2) } END { printf "\n" }'
+cat "$RT1" | awk '{ printf "%0.2f%\t%0.2f%\t", 100 * ($4 / $2 - 1), 100 * ($6 / $2 - 1) } END { printf "\n" }'
+cat "$RTS" | awk '{ printf "%0.2f%\t%0.2f%\t", 100 * ($4 / $2 - 1), 100 * ($6 / $2 - 1) } END { printf "\n" }'

@@ -1,0 +1,16 @@
+#!/bin/zsh
+
+#CONFIG=my_config
+CONFIG=smallvalue.cfg
+#CONFIG=readonly.cfg
+TIME=1m
+C=100
+
+for i in  `seq 1 $@`
+do
+    urxvt -fn xft:terminus:pixelsize=24 -fb xft:terminus:pixelsize=24 --geometry 119x16 -e memaslap -s 127.0.0.1:11211 -T $C -c $C -o 0.9 -S 1s -t $TIME -Fconfig/$CONFIG &
+    #memaslap -s 127.0.0.1:11211 -T 64 -c 64 -o 0.9 -S 1s -t $TIME -Fconfig/$CONFIG > log/ms_$(date +%y-%m-%d_%H:%M:%S)_$i-$@ &
+
+    #urxvt -fn xft:terminus:pixelsize=24 -fb xft:terminus:pixelsize=24 --geometry 119x16 -e memaslap -s 127.0.0.1:11211 -T $C -c $C -o 0.9 -w 1k -S 1s -t $TIME -Fconfig/$CONFIG &
+    #memaslap -s 127.0.0.1:11211 -T 64 -c 64 -o 0.9 -w 1k -S 1s -t $TIME -Fconfig/$CONFIG > log/ms_$(date +%y-%m-%d_%H:%M:%S)_$i-$@ &
+done

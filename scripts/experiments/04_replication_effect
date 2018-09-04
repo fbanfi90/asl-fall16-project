@@ -1,0 +1,196 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/experiments/04_replication_effect
+
+# Connections - put the one you want BELOW the other.
+
+#################################### LOCAL ####################################
+EXPERIMENT=LOCAL_04_replication_effect
+USER=fabio
+CLIENT_IPS[1]=127.0.0.1
+CLIENT_IPS[2]=127.0.0.1
+CLIENT_IPS[3]=127.0.0.1
+SERVER_IPS[1]=127.0.0.1
+SERVER_IPS[2]=127.0.0.1
+SERVER_IPS[3]=127.0.0.1
+SERVER_IPS[4]=127.0.0.1
+SERVER_IPS[5]=127.0.0.1
+SERVER_IPS[6]=127.0.0.1
+SERVER_IPS[7]=127.0.0.1
+SERVER_PRIV_IPS[1]=127.0.0.1
+SERVER_PRIV_IPS[2]=127.0.0.1
+SERVER_PRIV_IPS[3]=127.0.0.1
+SERVER_PRIV_IPS[4]=127.0.0.1
+SERVER_PRIV_IPS[5]=127.0.0.1
+SERVER_PRIV_IPS[6]=127.0.0.1
+SERVER_PRIV_IPS[7]=127.0.0.1
+SERVER_PORTS[1]=11212
+SERVER_PORTS[2]=11213
+SERVER_PORTS[3]=11214
+SERVER_PORTS[4]=11215
+SERVER_PORTS[5]=11216
+SERVER_PORTS[6]=11217
+SERVER_PORTS[7]=11218
+MIDDLEWARE_IP=127.0.0.1
+MIDDLEWARE_PRIV_IP=127.0.0.1
+MIDDLEWARE_PORT=11211
+###############################################################################
+
+#################################### REMOTE ###################################
+EXPERIMENT=04_replication_effect
+USER=fbanfi
+CLIENT_IPS[1]=fbanfiforaslvms8.westeurope.cloudapp.azure.com
+CLIENT_IPS[2]=fbanfiforaslvms9.westeurope.cloudapp.azure.com
+CLIENT_IPS[3]=fbanfiforaslvms10.westeurope.cloudapp.azure.com
+SERVER_IPS[1]=fbanfiforaslvms1.westeurope.cloudapp.azure.com
+SERVER_IPS[2]=fbanfiforaslvms4.westeurope.cloudapp.azure.com
+SERVER_IPS[3]=fbanfiforaslvms5.westeurope.cloudapp.azure.com
+SERVER_IPS[4]=fbanfiforaslvms6.westeurope.cloudapp.azure.com
+SERVER_IPS[5]=fbanfiforaslvms7.westeurope.cloudapp.azure.com
+SERVER_IPS[6]=fbanfiforaslvms2.westeurope.cloudapp.azure.com
+SERVER_IPS[7]=fbanfiforaslvms3.westeurope.cloudapp.azure.com
+SERVER_PRIV_IPS[1]=10.0.0.13
+SERVER_PRIV_IPS[2]=10.0.0.12
+SERVER_PRIV_IPS[3]=10.0.0.11
+SERVER_PRIV_IPS[4]=10.0.0.7
+SERVER_PRIV_IPS[5]=10.0.0.14
+SERVER_PRIV_IPS[6]=10.0.0.10
+SERVER_PRIV_IPS[7]=10.0.0.6
+SERVER_PORTS[1]=11212
+SERVER_PORTS[2]=11212
+SERVER_PORTS[3]=11212
+SERVER_PORTS[4]=11212
+SERVER_PORTS[5]=11212
+SERVER_PORTS[6]=11212
+SERVER_PORTS[7]=11212
+MIDDLEWARE_IP=fbanfiforaslvms11.westeurope.cloudapp.azure.com
+MIDDLEWARE_PRIV_IP=10.0.0.9
+MIDDLEWARE_PORT=11211
+###############################################################################
+
+# Settings.
+MIDDLEWARE=middleware-fbanfi.jar
+MEMASLAP=libmemcached-1.0.18/clients/memaslap
+LOGDIR_ROOT=log/experiments
+CONGIGDIR_ROOT=config
+CONFIG=writes5.cfg
+THREADS=16
+VIRTUAL_CLIENTS=70
+REPETITIONS=4
+RUNTIME=50s
+DELAY=5
+
+# Constants and macros.
+SSH="ssh -oStrictHostKeyChecking=no"
+SCP="scp -oStrictHostKeyChecking=no"
+EXPERIMENT=$EXPERIMENT'_'$(date +%y-%m-%d_%H:%M:%S)
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+
+# Accept new public keys.
+echo -e "Warming up remote machines . . . $PAD"
+grep -v azure ~/.ssh/known_hosts > known_hosts.temp; cat known_hosts.temp > ~/.ssh/known_hosts; rm known_hosts.temp
+for c in $(seq 3); do $SSH $USER@${CLIENT_IPS[$c]} "ls > /dev/null"; done
+for s in $(seq 7); do $SSH $USER@${SERVER_IPS[$s]} "ls > /dev/null"; done
+$SSH $USER@$MIDDLEWARE_IP "ls > /dev/null"
+echo -e $OK
+
+# Update middleware.
+echo -e "Updating middleware . . . $PAD"
+$SCP dist/$MIDDLEWARE $USER@$MIDDLEWARE_IP:~ > /dev/null
+echo -e $OK
+
+# Set and create log folder on remote clients and upload configuration file.
+echo -e "Preparing clients and middleware . . . $PAD"
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+for c in $(seq 3)
+do
+    $SSH $USER@${CLIENT_IPS[$c]} "mkdir -p $LOGDIR $CONGIGDIR_ROOT"
+    $SCP $CONGIGDIR_ROOT/$CONFIG $USER@${CLIENT_IPS[$c]}:$CONGIGDIR_ROOT/$CONFIG > /dev/null
+done
+$SSH $USER@$MIDDLEWARE_IP "mkdir -p $LOGDIR"
+echo -e $OK
+
+# Create log folder on local.
+mkdir -p $LOGDIR
+
+# Variate number of servers.
+for S in $(seq 3 2 7)
+do
+    # Prepare the servers list.
+    SERVERS=
+    for s in $(seq $S); do SERVERS="$SERVERS ${SERVER_PRIV_IPS[$s]}:${SERVER_PORTS[$s]}"; done
+
+    # Variate the replication factor.
+    for R in {1,$((($S + 1) / 2)),$S}
+    do
+        # Repeat the experiment four times.
+        for r in $(seq 1 $REPETITIONS)
+        do
+            echo -e "=================[ S = $S, R = $R ($r/$REPETITIONS) ]================="
+
+            for s in $(seq $S)
+            do
+                echo -e "Starting server $s . . . $PAD"
+                $SSH $USER@${SERVER_IPS[$s]} "memcached -p ${SERVER_PORTS[$s]} -t 1 &" &
+                echo -e $OK
+            done
+
+            echo -e "Waiting for servers to be operative . . . $PAD"
+            sleep $DELAY
+            echo -e $OK
+
+            echo -e "Starting middleware . . . $PAD"
+            $SSH $USER@$MIDDLEWARE_IP "java -jar $MIDDLEWARE -l $MIDDLEWARE_PRIV_IP -p $MIDDLEWARE_PORT -t $THREADS -r $R -m $SERVERS" &
+            echo -e $OK
+
+            echo -e "Waiting for middleware to be operative . . . $PAD"
+            sleep $DELAY
+            echo -e $OK
+
+            # Set log files names.
+            for c in $(seq 3); do LOGFILES[$c]=$LOGDIR/client$c'_'S$S'_'R$R'_'r$r.log; done
+
+            # Prepare memaslap command.
+            CMD="$MEMASLAP -s$MIDDLEWARE_PRIV_IP:$MIDDLEWARE_PORT -T$VIRTUAL_CLIENTS -c$VIRTUAL_CLIENTS -o0.9 -S1s -t$RUNTIME -F$CONGIGDIR_ROOT/$CONFIG >> "
+            PIDs=""
+
+            for c in $(seq 3)
+            do
+                echo -e "Starting client $c . . . $PAD"
+                $SSH $USER@${CLIENT_IPS[$c]} "$CMD ${LOGFILES[$c]}" & PIDs="$PIDs $!"
+                echo -e $OK
+            done
+
+            echo -e "Waiting for clients to terminate . . . $PAD"
+            for PID in $PIDs; do wait $PID; done
+            echo -e $OK
+
+            echo -e "Shutting down middleware . . . $PAD"
+            $SSH $USER@$MIDDLEWARE_IP "pkill java"
+            echo -e $OK
+
+            echo -e "Shutting down servers . . . $PAD"
+            for s in $(seq $S); do $SSH $USER@${SERVER_IPS[$s]} "pkill memcached"; done
+            echo -e $OK
+
+            echo -e "Downloading clients' logs . . . $PAD"
+            for c in $(seq 3); do $SCP $USER@${CLIENT_IPS[$c]}:${LOGFILES[$c]} ${LOGFILES[$c]} > /dev/null; done
+            echo -e $OK
+
+            echo -e "Saving middleware's log file . . . $PAD"
+            MW_LOGFILE=$LOGDIR/middleware_S$S'_'R$R'_'r$r.log
+            $SSH $USER@$MIDDLEWARE_IP "cp \$(ls log/mw_* | tail -n 1) $MW_LOGFILE"
+            $SCP $USER@$MIDDLEWARE_IP:$MW_LOGFILE $MW_LOGFILE > /dev/null
+            echo -e $OK
+        done
+    done
+done
+
+echo "========================================================"
+echo -e "Compressing logs . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo "========================================================"
+echo "Experiment '$EXPERIMENT' terminated!"

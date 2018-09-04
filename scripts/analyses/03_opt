@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./03_opt
+
+LOGDIR=../../log/experiments/03_maximum_throughput_16-11-11_21:56:33
+
+REPETITIONS=4
+MINC=30
+STPC=10
+MAXC=50
+MINT=16
+STPT=8
+MAXT=24
+
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+function ee { if (($1 < 10)); then echo "00$1"; elif (($1 < 100)); then echo "0$1"; else echo $1; fi }
+
+echo -e "Mean      Std     50%    80%   90%   95%   99%\n==================================================="
+
+# Variate number of virtual clients.
+for C in $(seq $MINC $STPC $MAXC)
+do
+    # Variate number of threads in thread pool of middleware.
+    for T in $(seq $MINT $STPT $MAXT)
+    do
+        # Repeat the experiment.
+        for R in $(seq 1 $REPETITIONS)
+        do
+            # Set log files names.
+            LOGFILE1=$LOGDIR/client1_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE2=$LOGDIR/client2_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE3=$LOGDIR/client3_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE4=$LOGDIR/client4_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE5=$LOGDIR/client5_C$(ee $C)_T$(e $T)_R$(e $R).log
+
+            # Read clients data.
+            TPS1=$(cat $LOGFILE1 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS1_AVG=$(echo $TPS1 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS1_STD=$(echo $TPS1 | awk -v avg="$TPS1_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS2=$(cat $LOGFILE2 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS2_AVG=$(echo $TPS2 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS2_STD=$(echo $TPS2 | awk -v avg="$TPS2_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS3=$(cat $LOGFILE3 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS3_AVG=$(echo $TPS3 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS3_STD=$(echo $TPS3 | awk -v avg="$TPS3_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS4=$(cat $LOGFILE4 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS4_AVG=$(echo $TPS4 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS4_STD=$(echo $TPS4 | awk -v avg="$TPS4_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS5=$(cat $LOGFILE5 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS5_AVG=$(echo $TPS5 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS5_STD=$(echo $TPS5 | awk -v avg="$TPS5_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+
+            # Memorize TPS's AVG and STD of this run.
+            TPS_AVGs="$TPS_AVGs $(echo $TPS1_AVG $TPS2_AVG $TPS3_AVG $TPS4_AVG $TPS5_AVG | awk '{print $1 + $2 + $3 + $4 + $5}')"
+            TPS_STDs="$TPS_STDs $(echo $TPS1_STD $TPS2_STD $TPS3_STD $TPS4_STD $TPS5_STD | awk '{print sqrt($1 + $2 + $3 + $4 + $5)}')"
+
+            TPS=$(echo -e "$TPS\n$(paste <(echo "$TPS1") <(echo "$TPS2") <(echo "$TPS3") <(echo "$TPS4") <(echo "$TPS5") | awk '{print $1+$2+$3+$4+$5}')\n")
+        done
+
+        TPS_AVG=$(echo $TPS_AVGs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%0.2f\n", sum/NF}')
+        TPS_STD=$(echo $TPS_STDs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%0.2f\n", sum/NF}')
+
+        echo "$TPS" | sort -n | awk -v avg=$TPS_AVG -v std=$TPS_STD '{ all[NR] = $0 } END { printf "%0.2f  %0.2f  %d  %d  %d  %d  %d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+        #echo "$TPS" | sort -n | awk -v avg=$TPS_AVG -v std=$TPS_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }'
+
+        # Reset variables.
+        TPS_AVGs=
+        TPS_STDs=
+        TPS=
+    done
+done

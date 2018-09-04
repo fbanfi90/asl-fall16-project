@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./04_breakdown
+
+LOGDIR=../../log/experiments/04_replication_effect_16-11-20_13:16:14
+
+PLOTDIR=04_plots
+DATAFILE_PERCS=04_breakdown_percs.data
+DATAFILE_MEANS=04_breakdown_means
+FONTSZ=20
+
+echo -e "S\tR\tTime\tMean\tStd\t50%\t80%\t90%\t95%\t99%\n============================================================================="
+
+# Variate number of servers.
+for S in $(seq 3 2 7)
+do
+    OUT=$DATAFILE_MEANS'_'$S
+    rm -f $OUT.data
+
+    # Variate the replication factor.
+    for R in {1,$((($S + 1) / 2)),$S}
+    do
+        # Concatenate timings in middle third of each repetition.
+        DATA=''
+        for f in $LOGDIR/middleware_S$S'_'R$R'_'r{1,2,3,4}.log
+        do
+            TOT=$(cat $f | tail -n 1 | awk '{ print $2 }')
+            MIN=$(($TOT / 300))
+            MAX=$((2 * $TOT / 300))
+            FDATA=$(cat $f | grep GET | tail -n $MAX | head -n $MIN)
+            DATA=$(echo -e "$DATA\n$FDATA")
+        done
+        CNT=$(echo "$DATA" | wc -l)
+
+        # Get means of timings.
+        AVGS=$(echo "$DATA" | awk '{ pro += $3 - ($4 + $5); que += $4; srv += $5; n++ } END { if (n > 0) print pro / n, que / n, srv / n; }')
+        PRO_AVG=$(echo $AVGS | awk '{ print $1 }')
+        QUE_AVG=$(echo $AVGS | awk '{ print $2 }')
+        SRV_AVG=$(echo $AVGS | awk '{ print $3 }')
+
+        # Get standard deviations of timings.
+        STDS=$(echo "$DATA" | awk -v pro_avg=$PRO_AVG -v que_avg=$QUE_AVG -v srv_avg=$SRV_AVG '{ pro += ($3 - ($4 + $5) - pro_avg) ^ 2; que += ($4 - que_avg) ^ 2; srv += ($5 - srv_avg) ^ 2; n++ } END { if (n > 0) print sqrt(pro / (n - 1)), sqrt(que / (n - 1)), sqrt(srv / (n - 1)); }')
+        PRO_STD=$(echo $STDS | awk '{ print $1 }')
+        QUE_STD=$(echo $STDS | awk '{ print $2 }')
+        SRV_STD=$(echo $STDS | awk '{ print $3 }')
+
+        # Sort each timing.
+        PRO_SRT=$(echo "$DATA" | awk '{ print $3 - ($4 + $5) }' | sort -n)
+        QUE_SRT=$(echo "$DATA" | awk '{ print $4 }' | sort -n)
+        SRV_SRT=$(echo "$DATA" | awk '{ print $5 }' | sort -n)
+
+        # Print 50, 90, 95, and 99 quantiles of timings.
+        echo -e "$S\t$R\tT_pro\t$(echo "$PRO_SRT" | awk -v avg=$PRO_AVG -v std=$PRO_STD '{ all[NR] = $0 } END { printf "%0.2f\t%0.2f\t%d\t%d\t%d\t%d\t%d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }')"
+        echo -e "$S\t$R\tT_que\t$(echo "$QUE_SRT" | awk -v avg=$QUE_AVG -v std=$QUE_STD '{ all[NR] = $0 } END { printf "%0.2f\t%0.2f\t%d\t%d\t%d\t%d\t%d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }')"
+        echo -e "$S\t$R\tT_srv\t$(echo "$SRV_SRT" | awk -v avg=$SRV_AVG -v std=$SRV_STD '{ all[NR] = $0 } END { printf "%0.2f\t%0.2f\t%d\t%d\t%d\t%d\t%d\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }')"
+        #echo -e "\$$S\$ & \$$R\$ & \$\Tpro\$ & $(echo "$PRO_SRT" | awk -v avg=$PRO_AVG -v std=$PRO_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$ \\\\\\\\\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }')"
+        #echo -e "\$$S\$ & \$$R\$ & \$\Tque\$ & $(echo "$QUE_SRT" | awk -v avg=$QUE_AVG -v std=$QUE_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$ \\\\\\\\\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }')"
+        #echo -e "\$$S\$ & \$$R\$ & \$\Tsrv\$ & $(echo "$SRV_SRT" | awk -v avg=$SRV_AVG -v std=$SRV_STD '{ all[NR] = $0 } END { printf "$%0.2f$ & $%0.2f$ & $%d$ & $%d$ & $%d$ & $%d$ & $%d$ \\\\\\\\\n", avg, std, all[int(NR * 0.50 - 0.5)], all[int(NR * 0.80 - 0.5)], all[int(NR * 0.90 - 0.5)], all[int(NR * 0.95 - 0.5)], all[int(NR * 0.99 - 0.5)] }')"
+
+        echo "R=$R $PRO_AVG $QUE_AVG $SRV_AVG" >> $OUT.data
+    done
+    gnuplot << EOF
+        set terminal postscript eps color 'Times-Roman,$FONTSZ'
+        set output '| epstopdf --filter --outfile=$PLOTDIR/$OUT.pdf'
+        set key invert #reverse Left outside
+        set ylabel "Total"
+        set style data histogram
+        set style histogram rowstacked
+        set style fill solid border -1
+        set boxwidth 0.75
+        set yrange [0:6000]
+        plot '$OUT.data' using 2:xtic(1) t 'T_{pro}', \
+            '' using 3 t 'T_{que}', \
+            '' using 4 t 'T_{srv}'
+        #set yrange [0:100]
+        #plot '$OUT.data' using (100*\$2/(\$2+\$3+\$4)):xtic(1) t 'T_{pro}', \
+        #    '' using (100*\$3/(\$2+\$3+\$4)) t 'T_{que}', \
+        #    '' using (100*\$4/(\$2+\$3+\$4)) t 'T_{srv}'
+EOF
+done

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./04_descrease
+# (Assumes '04_clients_Set.data' and '04_clients_Get.data' exist, from '04_clients'.)
+
+SET=04_clients_Set.data
+GET=04_clients_Get.data
+
+echo -e "S/2\tS\tS/2\tS\tS/2\tS\n============================================="
+cat "$SET" | awk '{ printf "%0.2f%\t%0.2f%\t", 100 * (1 - $4 / $2), 100 * (1 - $6 / $2) } END { printf "\n" }'
+cat "$GET" | awk '{ printf "%0.2f%\t%0.2f%\t", 100 * (1 - $4 / $2), 100 * (1 - $6 / $2) } END { printf "\n" }'

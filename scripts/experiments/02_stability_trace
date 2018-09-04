@@ -1,0 +1,207 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/experiments/02_stability_trace
+
+# Connections - put the one you want BELOW the other.
+
+#################################### LOCAL ####################################
+EXPERIMENT=LOCAL_02_stability_trace
+USER=fabio
+CLIENT1_IP=127.0.0.1
+CLIENT2_IP=127.0.0.1
+CLIENT3_IP=127.0.0.1
+SERVER1_IP=127.0.0.1
+SERVER2_IP=127.0.0.1
+SERVER3_IP=127.0.0.1
+SERVER1_IP_PRIV=127.0.0.1
+SERVER2_IP_PRIV=127.0.0.1
+SERVER3_IP_PRIV=127.0.0.1
+SERVER1_PORT=11212
+SERVER2_PORT=11213
+SERVER3_PORT=11214
+MIDDLEWARE_IP=127.0.0.1
+MIDDLEWARE_IP_PRIV=127.0.0.1
+MIDDLEWARE_PORT=11211
+###############################################################################
+
+#################################### REMOTE ###################################
+EXPERIMENT=02_stability_trace
+USER=fbanfi
+CLIENT1_IP=fbanfiforaslvms2.westeurope.cloudapp.azure.com
+CLIENT2_IP=fbanfiforaslvms3.westeurope.cloudapp.azure.com
+CLIENT3_IP=fbanfiforaslvms10.westeurope.cloudapp.azure.com
+SERVER1_IP=fbanfiforaslvms1.westeurope.cloudapp.azure.com
+SERVER2_IP=fbanfiforaslvms4.westeurope.cloudapp.azure.com
+SERVER3_IP=fbanfiforaslvms5.westeurope.cloudapp.azure.com
+SERVER1_IP_PRIV=10.0.0.13
+SERVER2_IP_PRIV=10.0.0.12
+SERVER3_IP_PRIV=10.0.0.11
+SERVER1_PORT=11212
+SERVER2_PORT=11212
+SERVER3_PORT=11212
+MIDDLEWARE_IP=fbanfiforaslvms11.westeurope.cloudapp.azure.com
+MIDDLEWARE_IP_PRIV=10.0.0.9
+MIDDLEWARE_PORT=11211
+###############################################################################
+
+# Settings.
+MIDDLEWARE=middleware-fbanfi.jar
+MEMASLAP=libmemcached-1.0.18/clients/memaslap
+LOGDIR_ROOT=log/experiments
+CONFIG=smallvalue.cfg
+VCLIENTS=64
+RUNTIME=1h
+THREADS=16
+REPLICATION=3
+DELAY=5
+
+# Constants and macros.
+SSH="ssh -oStrictHostKeyChecking=no"
+SCP="scp -oStrictHostKeyChecking=no"
+EXPERIMENT=$EXPERIMENT'_'$(date +%y-%m-%d_%H:%M:%S)
+TIME_UNIT=$(echo -n $RUNTIME | tail -c 1)
+if [ $TIME_UNIT = s ]; then RUNTIME_SECONDS=$(echo ${RUNTIME%s})
+elif [ $TIME_UNIT = m ]; then RUNTIME_SECONDS=$(($(echo ${RUNTIME%m}) * 60))
+else RUNTIME_SECONDS=$(($(echo ${RUNTIME%h}) * 3600)); fi
+MIDDLEWARE_TIME=$(($RUNTIME_SECONDS + 2 * $DELAY))
+SERVER_TIME=$(($MIDDLEWARE_TIME + 2 * $DELAY))
+WAIT_TIME=$MIDDLEWARE_TIME
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+
+# Accept new public keys.
+echo -e "Warming up remote machines . . . $PAD"
+grep -v azure ~/.ssh/known_hosts > known_hosts.temp; cat known_hosts.temp > ~/.ssh/known_hosts; rm known_hosts.temp
+$SSH $USER@$CLIENT1_IP "ls > /dev/null"
+$SSH $USER@$CLIENT2_IP "ls > /dev/null"
+$SSH $USER@$CLIENT3_IP "ls > /dev/null"
+$SSH $USER@$SERVER1_IP "ls > /dev/null"
+$SSH $USER@$SERVER2_IP "ls > /dev/null"
+$SSH $USER@$SERVER3_IP "ls > /dev/null"
+$SSH $USER@$MIDDLEWARE_IP "ls > /dev/null"
+echo -e $OK
+
+# Update middleware.
+echo -e "Updating middleware . . . $PAD"
+$SCP dist/$MIDDLEWARE $USER@$MIDDLEWARE_IP:~ > /dev/null
+echo -e $OK
+
+# Set and create log folder on remote clients.
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+$SSH $USER@$CLIENT1_IP "mkdir -p $LOGDIR"
+$SSH $USER@$CLIENT2_IP "mkdir -p $LOGDIR"
+$SSH $USER@$CLIENT3_IP "mkdir -p $LOGDIR"
+
+echo -e "Starting server 1 for $SERVER_TIME seconds . . . $PAD"
+$SSH $USER@$SERVER1_IP "memcached -p $SERVER1_PORT -t 1 & sleep $SERVER_TIME; kill -TERM %1" &
+echo -e $OK
+
+echo -e "Starting server 2 for $SERVER_TIME seconds . . . $PAD"
+$SSH $USER@$SERVER2_IP "memcached -p $SERVER2_PORT -t 1 & sleep $SERVER_TIME; kill -TERM %1" &
+echo -e $OK
+
+echo -e "Starting server 3 for $SERVER_TIME seconds . . . $PAD"
+$SSH $USER@$SERVER3_IP "memcached -p $SERVER3_PORT -t 1 & sleep $SERVER_TIME; kill -TERM %1" &
+echo -e $OK
+
+echo -e "Waiting for servers to be operative . . . $PAD"
+sleep $DELAY
+echo -e $OK
+
+echo -e "Starting middleware for $MIDDLEWARE_TIME seconds . . . $PAD"
+$SSH $USER@$MIDDLEWARE_IP "java -jar $MIDDLEWARE -l $MIDDLEWARE_IP_PRIV -p $MIDDLEWARE_PORT -t $THREADS -r $REPLICATION -m $SERVER1_IP_PRIV:$SERVER1_PORT $SERVER2_IP_PRIV:$SERVER2_PORT $SERVER3_IP_PRIV:$SERVER3_PORT & sleep $MIDDLEWARE_TIME; kill -TERM %1" &
+echo -e $OK
+
+echo -e "Waiting for middleware to be operative . . . $PAD"
+sleep $DELAY
+echo -e $OK
+
+# Set log files names.
+LOGFILE1=$LOGDIR/client1.log
+LOGFILE2=$LOGDIR/client2.log
+LOGFILE3=$LOGDIR/client3.log
+
+echo -e "Starting client 1 . . . $PAD"
+CMD1="$MEMASLAP -s$MIDDLEWARE_IP_PRIV:$MIDDLEWARE_PORT -T$VCLIENTS -c$VCLIENTS -o0.9 -S1s -t$RUNTIME -Fconfig/$CONFIG >> $LOGFILE1 &"
+$SSH $USER@$CLIENT1_IP $CMD1 &
+echo -e $OK
+
+echo -e "Starting client 2 . . . $PAD"
+CMD2="$MEMASLAP -s$MIDDLEWARE_IP_PRIV:$MIDDLEWARE_PORT -T$VCLIENTS -c$VCLIENTS -o0.9 -S1s -t$RUNTIME -Fconfig/$CONFIG >> $LOGFILE2 &"
+$SSH $USER@$CLIENT2_IP $CMD2 &
+echo -e $OK
+
+echo -e "Starting client 3 . . . $PAD"
+CMD3="$MEMASLAP -s$MIDDLEWARE_IP_PRIV:$MIDDLEWARE_PORT -T$VCLIENTS -c$VCLIENTS -o0.9 -S1s -t$RUNTIME -Fconfig/$CONFIG >> $LOGFILE3 &"
+$SSH $USER@$CLIENT3_IP $CMD3 &
+echo -e $OK
+
+echo -e "Waiting for clients to terminate . . . $PAD"
+for i in $(seq 100)
+do
+    echo -e "\033[51G[ $i% ]\c"
+    sleep $(echo $(echo $WAIT_TIME 100 | awk '{print $1 / $2}'))
+done
+echo -e "\033[51G"$OK"  "
+
+echo -e "Extracting data from clients' logs . . . $PAD"
+
+# Copy logs from remote.
+mkdir -p $LOGDIR
+$SCP $USER@$CLIENT1_IP:$LOGFILE1 $LOGFILE1 > /dev/null
+$SCP $USER@$CLIENT2_IP:$LOGFILE2 $LOGFILE2 > /dev/null
+$SCP $USER@$CLIENT3_IP:$LOGFILE3 $LOGFILE3 > /dev/null
+
+# Read client 1 data.
+TPS1=$(cat $LOGFILE1 | grep Period | awk '{print $4}' | awk 'NR % 3 == 0')
+AVGSTD1=$(cat $LOGFILE1 | grep Period | awk '{print $9" "$10}' | awk 'NR % 3 == 0')
+
+# Read client 2 data.
+TPS2=$(cat $LOGFILE2 | grep Period | awk '{print $4}' | awk 'NR % 3 == 0')
+AVGSTD2=$(cat $LOGFILE2 | grep Period | awk '{print $9" "$10}' | awk 'NR % 3 == 0')
+
+# Read client 3 data.
+TPS3=$(cat $LOGFILE3 | grep Period | awk '{print $4}' | awk 'NR % 3 == 0')
+AVGSTD3=$(cat $LOGFILE3 | grep Period | awk '{print $9" "$10}' | awk 'NR % 3 == 0')
+
+echo -e $OK
+
+echo -e "Aggregating clients' data . . . $PAD"
+OUT1=$LOGDIR/tps.data
+OUT2=$LOGDIR/rt.data
+echo "$(paste <(seq $RUNTIME_SECONDS) <(echo "$TPS1") <(echo "$TPS2") <(echo "$TPS3") | awk '{print $1" "($2+$3+$4)}')" >> $OUT1
+echo "$(paste <(seq $RUNTIME_SECONDS) <(echo "$AVGSTD1") <(echo "$AVGSTD2") <(echo "$AVGSTD3") | awk '{print $1" "($2+$4+$6)/3" "($3+$5+$7)/3}')" >> $OUT2
+echo -e $OK
+
+echo -e "Compressing logs and data . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo -e "Plotting data . . . $PAD"
+cd $EXPERIMENT
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=tps.pdf'
+    set xlabel 'Time (s)'
+    set ylabel 'Throughput (requests/s)'
+    set xtics 0,600,3600
+    set xrange [0:3600]
+    set yrange [0:]
+    unset key
+    plot 'tps.data' w lines lc rgb '0x3366FF'
+EOF
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=rt.pdf'
+    set xlabel 'Time (s)'
+    set ylabel 'Response time ({/Symbol m}s)'
+    set xtics 0,600,3600
+    set xzeroaxis
+    set xrange [0:3600]
+    unset key
+    plot 'rt.data' w errorbars lc rgb '0x77AAFF', '' u 2 pt 13 ps 0.5 lc rgb '0x3366FF'
+EOF
+echo -e $OK
+
+echo "Experiment '$EXPERIMENT' terminated!"

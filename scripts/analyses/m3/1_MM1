@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analyses/m3; ./1_MM1
+# Uncomment line 32 to use the maximum throughput as the parameter mu.
+
+WARMUP=60
+STABLE_PHASE=480
+RUNTIME=600
+
+# OLD
+LOGDIR=../../../log/experiments/02_stability_trace_16-10-20_20:38:14
+MWLOG=mw_16-10-20_18:40:14.log
+
+# NEW
+LOGDIR=../../../log/experiments/02_stability_trace_16-11-15_14:14:51
+MWLOG=mw_16-11-15_13:15:40.log
+
+# Get mean arrival rate as throughput from memaslap.
+X1=$(cat $LOGDIR/client1.log | tail -n 1 | awk '{ print $7 }')
+X2=$(cat $LOGDIR/client2.log | tail -n 1 | awk '{ print $7 }')
+X3=$(cat $LOGDIR/client3.log | tail -n 1 | awk '{ print $7 }')
+lambda=$(($X1 + $X2 + $X3))
+
+# Get mean service rate from middleware logs as mean server time.
+mu=$(cat $LOGDIR/$MWLOG | tail -n +2 | awk '{ tot += $5 } END { print 1 / (tot / 1000000 / NR / 3 / 17) }')
+
+# Get mean service rate from memaslap logs as maximum TPS.
+Xs1=$(cat $LOGDIR/client1.log | grep Total -A 2 | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $4 }')
+Xs2=$(cat $LOGDIR/client2.log | grep Total -A 2 | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $4 }')
+Xs3=$(cat $LOGDIR/client3.log | grep Total -A 2 | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $4 }')
+#mu=$(paste <(echo "$Xs1") <(echo "$Xs2") <(echo "$Xs3") | awk '{ if ($1 + $2 + $3 > max) max = $1 + $2 + $3 } END { print max } ')
+
+# Get traffic rate.
+rho=$(echo $lambda $mu | awk '{ print $1 / $2 }')
+#rho=$(echo "scale=6; $lambda / $mu" | bc -l)
+
+# Get prob. of zero jobs.
+p0=$(echo $rho | awk '{ print 1 - $1 }')
+
+# Get mean # of jobs.
+En=$(echo $rho | awk '{ print $1 / (1 - $1) }')
+
+# Get variance of # of jobs.
+Vn=$(echo $rho | awk '{ print $1 / (1 - $1) ^ 2 }')
+
+# Get mean # of jobs in queue.
+Enq=$(echo $rho | awk '{ print $1 ^ 2 / (1 - $1) }')
+
+# Get variance of # of jobs in queue.
+Vnq=$(echo $rho | awk '{ print $1 ^ 2 * (1 + $1 - $1 ^ 2) / (1 - $1) ^ 2 }')
+
+# Get mean response time.
+Er=$(echo $mu $rho | awk '{ print (1 / $1) / (1 - $2) * 1000000 }')
+
+# Get variance of response time.
+Vr=$(echo $mu $rho | awk '{ print (1 / $1 ^ 2) / (1 - $2) ^ 2  * 1000000 }')
+
+# Get mean waiting time.
+Ew=$(echo $mu $rho | awk '{ print $2 * (1 / $1) / (1 - $2) * 1000000 }')
+
+# Get variance of waiting time.
+Vw=$(echo $mu $rho | awk '{ print (2 - $2) * $2 / $1 ^ 2 / (1 - $2) ^ 2  * 1000000 }')
+
+echo lambda = $lambda
+echo mu = $mu
+echo rho = $rho
+echo p0 = $p0
+echo En = $En
+echo Vn = $Vn
+echo Enq = $Enq
+echo Vnq = $Vnq
+echo Er = $Er
+echo Vr = $Vr
+echo Ew = $Ew
+echo Vw = $Vw
+
+R1=$(cat $LOGDIR/client1.log | grep Avg: | tail -n 1 | awk '{ print $2 }')
+R2=$(cat $LOGDIR/client2.log | grep Avg: | tail -n 1 | awk '{ print $2 }')
+R3=$(cat $LOGDIR/client3.log | grep Avg: | tail -n 1 | awk '{ print $2 }')
+r=$(echo $R1 $R2 $R3 | awk '{ print ($1 + $2 + $3) / 3 }')
+echo r = $r
+echo $Er $r | awk '{ printf "%0.2f %\n", $1 / $2 * 100 }'

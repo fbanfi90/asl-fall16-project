@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analysis; ./04_clients ../../log/experiments/04_replication_effect_16-11-18_11:16:54
+
+REPETITIONS=4
+RUNTIME=50
+WARMUP=10
+STABLE_PHASE=30
+PLOTDIR=04_plots
+OUTFILE=04_clients
+FONTSZ=20
+
+for OP in {Set,Get}
+do
+    OUT=$OUTFILE'_'$OP
+    rm -f $OUT.data
+    for S in $(seq 3 2 7)
+    do
+        echo -n "$S " >> $OUT.data
+        for R in {1,$((($S + 1) / 2)),$S}
+        do
+            TPS_AVG_R=
+            TPS_STD_R=
+            for r in $(seq 1 $REPETITIONS)
+            do
+                TPS_AVG_C=
+                TPS_STD_C=
+                for c in $(seq 3)
+                do
+                    TPS=$(cat $@/client$c'_'S$S'_'R$R'_'r$r.log | grep -A 2 "$OP Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{print $4}')
+                    AVG=$(echo "$TPS" | awk '{ x += $1 } END { print x / NR; }')
+                    TPS_AVG_C=$(echo -e "$TPS_AVG_C\n$AVG")
+                    TPS_STD_C=$(echo -e "$TPS_STD_C\n$(echo "$TPS" | awk -v avg=$AVG '{ x += ($1 - avg) ^ 2 } END { print x / (NR - 1) }')")
+                done
+                TPS_AVG_R=$(echo -e "$TPS_AVG_R\n$(echo "$TPS_AVG_C" | tail -n +2 | awk '{ x += $1 } END { print x; }')")
+                TPS_STD_R=$(echo -e "$TPS_STD_R\n$(echo "$TPS_STD_C" | tail -n +2 | awk '{ x += $1 } END { print sqrt(x); }')")
+            done
+            TPS_AVG=$(echo "$TPS_AVG_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR; }')
+            TPS_STD=$(echo "$TPS_STD_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR; }')
+            echo -n "$TPS_AVG $TPS_STD " >> $OUT.data
+        done
+        echo "" >> $OUT.data
+    done
+
+    mkdir -p $PLOTDIR
+    gnuplot -p << EOF
+        set terminal postscript eps color 'Times-Roman,$FONTSZ'
+        set output '| epstopdf --filter --outfile=$PLOTDIR/$OUT.pdf'
+        set xlabel 'S (number of servers)'
+        set ylabel 'Throughput (requests / s)'
+        set yrange [0:]
+        set style data histogram
+        set style fill solid border
+        set style fill solid 0.3
+        set bars front
+        set style histogram clustered errorbars linewidth 1.5
+        plot '$OUT.data' using 2:3:xticlabels(1) title 'R=1', \
+            '' using 4:5:xticlabels(1) title 'R=(S+1)/2', \
+            '' using 6:7:xticlabels(1) title 'R=S'
+EOF
+    sleep 0.5
+    llpp $PLOTDIR/$OUT.pdf &
+done

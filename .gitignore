@@ -1,0 +1,28 @@
+# GIT
+.git
+
+# IntelliJ IDEA
+.idea
+asl-fall16-project.iml
+
+# Binaries
+build
+dist
+out
+
+# Logs
+log/experiments/*
+!log/experiments/*.zip
+
+# Datafiles
+scripts/analyses/*.data
+scripts/analyses/*/
+!scripts/analyses/m3
+scripts/analyses/m3/*.data
+scripts/analyses/m3/*/
+
+# LaTeX
+milestone*.aux
+milestone*.log
+milestone*.out
+milestone*.synctex.gz

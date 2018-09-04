@@ -1,0 +1,1152 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper, portrait, margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{verbatim}
+\usepackage[labelfont=bf]{caption}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{footnotebackref}
+\usepackage{amsthm}
+\usepackage{multirow}
+\usepackage{nicefrac}
+\usepackage{xcolor}
+\usepackage[page]{appendix}
+\usepackage{hhline}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{bm}
+%\usepackage{euler}
+%\usepackage{palatino,euler}
+%\usepackage{beton,euler}\renewcommand\mathcal\mathscr
+
+\newcommand\task[1]{{\color[HTML]{999999}\subsection{Task}#1}}
+\renewcommand\task[1]{}
+
+\usepackage{mathtools}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+
+\hypersetup
+{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    filecolor=blue,
+    urlcolor=blue,
+    linktoc=page            % Link only on page number
+}
+
+\renewcommand{\qedsymbol}{$\diamondsuit$}
+\newtheorem{hyp}{Hypothesis}
+\theoremstyle{definition}
+%\newtheorem*{ana}{Analysis}
+\newenvironment{ana}[1][\proofname]{\begin{proof}[Analysis]}{\end{proof}}
+\newcommand\re[1]{{\color[HTML]{ee1111}#1}}
+\newcommand\gr[1]{{\color[HTML]{11aa11}#1}}
+\newcommand\bl[1]{{\color[HTML]{1111dd}#1}}
+
+% Timestamps (DO NOT CHANGE!)
+\newcommand\Tarr{t_{\mathrm{arr}}}
+\newcommand\Tenq{t_{\mathrm{enq}}}
+\newcommand\Tdeq{t_{\mathrm{deq}}}
+\newcommand\Tsent{t_{\mathrm{sent}}}
+\newcommand\Trecv{t_{\mathrm{recv}}}
+\newcommand\Tleft{t_{\mathrm{left}}}
+\newcommand\Ttot{T_{\mathrm{tot}}}
+\newcommand\Tque{T_{\mathrm{que}}}
+\newcommand\Tsrv{T_{\mathrm{srv}}}
+\newcommand\Tpro{T_{\mathrm{pro}}}
+
+% Macros.
+\renewcommand\b[1]{{\bf{#1}}}
+\newcommand\p{^\prime}
+\renewcommand\t\texttt
+\newcommand\md[2]{\left[#1\mathrm{\ mod\ }#2\right]}
+\newcommand\td{{\color{red}\b{\textsf{[TODO]}}}}
+\newcommand\plotscale{1.2}
+\newcommand\tpsfstd{03\char`_maximum\char`_throughput\char`_16-11-10\char`_21:14:41}
+\newcommand\tpsfst{03_maximum_throughput_16-11-10_21:14:41}
+\newcommand\tpssndd{03\char`_maximum\char`_throughput\char`_16-11-11\char`_21:56:33}
+\newcommand\tpssnd{03_maximum_throughput_16-11-11_21:56:33}
+\newcommand\tpstrdd{03\char`_maximum\char`_throughput\char`_16-11-12\char`_12:07:39}
+\newcommand\tpstrd{03_maximum_throughput_16-11-12_12:07:39}
+\newcommand\repld{04\char`_replication\char`_effect\char`_16-11-20\char`_13:16:14}
+\newcommand\repl{04_replication_effect_16-11-20_13:16:14}
+\newcommand\wrtd{05\char`_writes\char`_effect\char`_16-11-20\char`_09:37:46}
+\newcommand\wrt{05_writes_effect_16-11-21_09:37:46}
+\newcommand\fvstd{5x40\char`_vs\char`_3x70}
+\newcommand\fvst{5x40_vs_3x70}
+\newcommand\newtraced{02\char`_stability\char`_trace\char`_16-11-15\char`_14:14:51}
+\newcommand\newtrace{02_stability_trace_16-11-15_14:14:51}
+
+\begin{document}
+
+\title{Advanced Systems Lab (Fall'16) -- Second
+Milestone}
+
+\author{Name: \emph{Fabio M. Banfi}\\Legi number: \emph{09-917-972}}
+
+\date{
+\vspace{4cm}
+\textbf{Grading} \\
+\begin{tabular}{|c|c|}
+\hline  \textbf{Section} & \textbf{Points} \\ 
+\hline  1 &  \\ 
+\hline  2 &  \\ 
+\hline  3 &  \\ 
+\hline \hline Total & \\
+\hline 
+\end{tabular} 
+}
+
+\maketitle
+\clearpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Maximum Throughput}\label{sec:max-tps}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The aim of this experiment is to find the highest achievable throughput of the system when being placed in front of five server machines with no replication and a read-only workload configuration, and to find the minimum number of threads and clients that together achieve this throughput. %, and to analyze in more detail the behavior of the middleware when put in this situation.
+The experiment has been run \emph{three} times, in order to first localize the optimal configuration point, and then gradually focus around it.
+
+\subsection{Experimental Setup}
+
+The setups of the three runs of the experiment are outlined in Table~\ref{tab:exp3}, where the only changes to the configuration between runs are marked in different colors, and separated by a bullet:
+\begin{center}
+\re{\bf Run 1}\quad$\bullet$\quad\gr{\bf Run 2}\quad$\bullet$\quad\bl{\bf Run 3}.
+\end{center}
+The experiment is carried out by the script located at  \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/experiments/03_maximum_throughput}, which\break collects all the \t{memaslap} and middleware outputs (\t{*.log}, inclusive repetitions), the extracted throughput data (\t{tps.data}), and also produces plots of the latter.
+The notation $a:b:c$ denotes the set of numbers $a,a+b,a+2b,\ldots,c$.
+Note that throughout the whole experiment, the five client machines always run with the same number of virtual clients.
+Thus, e.g. for the first run, at the beginning a total of $5\cdot10=50$ \emph{virtual clients} connect to the middleware, while at the end $5\cdot90=450$.
+
+\begin{table}[!h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|c|}
+            \hline \b{Servers} & 5 $\times$ A2 \\ 
+            {Threads / server machine} & 1 \\ 
+            \hline\hline \b{Clients} & 5 $\times$ A2 \\ 
+            {Virtual clients / machine} &  \re{\bf10\,:\,20\,:\,90}\quad$\bullet$\quad\gr{\bf10\,:\,10\,:\,70}\quad$\bullet$\quad\bl{\bf40\,:\,4\,:\,60} \\ 
+            {Keys size} & 16 Bytes \\
+            {Values size} & 128 Bytes \\
+            {Writes} & 0\% \\
+            %{Reads} & 100\% \\
+            {Overwrite proportion} & 90\% \\
+            {Window size} & 1 KByte \\
+            {Statistics} & 1 Second \\
+            \hline\hline \b{Middleware} & 1 $\times$ A4 \\ 
+            {Pool threads} & \re{\bf8\,:\,8\,:\,40}\quad$\bullet$\quad\gr{\bf16\,:\,8\,:\,32}\quad$\bullet$\quad\bl{\bf16,\,24} \\ 
+            {Replication} & 1 \\ 
+            \hline\hline {Runtime $\times$ repetitions} & 90 Seconds $\times$ 4 \\ 
+            {Log files} & \hyperref[f:tps1]{\t{max-tps1}}\quad$\bullet$\quad\hyperref[f:tps2]{\t{max-tps2}}\quad$\bullet$\quad\hyperref[f:tps3]{\t{max-tps3}} \\
+            \hline 
+        \end{tabular}
+    }
+    \caption{Maximum throughput experiment setup.}
+    \label{tab:exp3}
+\end{table}
+
+\subsection{Practical Issues}
+
+From a practical standpoint, some noteworthy difficulties were encountered while designing the experiment.
+The major issue was that with the read-only configuration, the \t{memaslap} clients would initially spend some time filling up the \t{memcached} servers,\footnote{This is the reason for setting the window size to 1k, as stated in Table~\ref{tab:exp3}: with such window size, the initial fill-up phase takes much less than with the default value of $10$k.} and as a consequence they would then start at different times.
+This is because they would finish filling \t{memcached} at different times, reaching time differences of up to $15$ seconds, when many clients connect simultaneously to the middleware.
+
+To bear with this additional difficulty, a $90$ seconds runtime was selected to allow the clients to reach a stable phase all together.
+This phase was assumed to contain the interval from $30$ to $60$ seconds, from which the output of the clients was then read.
+Note that this in particular implies that the throughput values of the \t{memaslap} clients are not synchronized; that is, the throughput of some client at ``its'' time $30$ is \emph{not} the throughput of that same client at time $30$ of some other client.
+Nevertheless, since the average behavior of the middleware is sought, it makes sense to add up throughputs of different clients at same times, since it is assumed that they have all reached a stable phase.
+
+
+\subsection{Results}
+
+This section presents the result of the three runs of the experiment.
+Each successive run is more granular in the number of virtual clients, and the number of threads is progressively reduced, until an optimal configuration which yields the \emph{maximum throughput} can be clearly observed.
+For each configuration, the \emph{mean} $\mu_{cr}$ and \emph{variance} $\sigma^2_{cr}$ of the throughput is calculated from the samples of the middle third (see previous section), where $c$ is the index of one of the $C=3$ clients and $r$ is the index of one of the $R=4$ repetitions.
+Then \emph{mean} $\bar\mu$ and \emph{standard deviation} $\mu\sigma$ are recorded according to
+\begin{equation}
+    \label{eqn:avgstd}
+    \bar\mu\doteq\frac1R\sum_{r=1}^R\sum_{c=1}^C\mu_{cr},\quad\bar\sigma\doteq\frac1R\sum_{r=1}^R\sqrt{\sum_{c=1}^C\sigma^2_{cr}}.
+\end{equation}
+
+\begin{comment}
+%As mentioned above, the experiment has been run three times.
+In the first run, a wide range of virtual clients has been selected, namely from $50$ to $450$, with a relatively large step of $100$, and for the threads a range from $8$ to $40$ with step $8$ has been selected.
+Noting that the system becomes more instable as the number of virtual clients increases, and also that having more than $32$ threads %in the reader thread thread-pool 
+does not increase the performance significantly, for the second run the range of virtual clients has been slightly shrinked to $50,350$ with a more granular step of $50$, and the number of threads to $16,32$, still with a step of $8$.
+Finally, in the third run of the experiment, an even more granular investigation has been performed around what resulted to be the optimal point, that is, from $200$ to $300$ virtual clients, just for $16$ and $24$ threads.
+In rest of this section, a detailed analysis of each of the three runs is presented.
+\end{comment}c
+
+\subsubsection{\re{Run 1}: Searching the Optimal Point Using a Wide Range}
+
+As outlined in Table~\ref{tab:exp3}, the first run investigates the behavior of the middleware when connected to five servers and five client machines, where each of the latter runs with $10,20,\ldots,100$ virtual clients.
+Therefore, the behavior of the middleware with $50,100,\ldots,500$ virtual clients is investigated.
+The number of threads is variated from $8$ to $40$, with a step of $8$.
+The result of this run of the experiment is summarized in Figure~\ref{fig:tps1}.
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[scale=\plotscale]{../../log/experiments/\tpsfst/tps.pdf}
+    \caption{Throughput of \re{\bf Run 1} of the maximum throughput experiment.}
+    \label{fig:tps1}
+\end{figure}
+
+\begin{hyp}
+    \label{hyp:run1}
+    The throughput as a function of connected virtual clients should initially grow quasi-linearly, and then reach a saturation point at which no more growth is observed.
+    Eventually, when the number of clients becomes too large, the throughput may start to decrease, and in general the system should become more unstable.
+    Also, the larger the number of threads in the pool thread, the higher is the expected throughput, but at some point having more threads should eventually provide no more gain, but instead decrease the performance.
+\end{hyp}
+\begin{ana}
+    First, note that the point at $450$ virtual clients / $16$ threads on Figure~\ref{fig:tps1} clearly appears to be outlier.
+    This is because in one of the four repetitions for that specific configuration, one of the clients has not produced any output, due to an unknown reason.
+    That point \emph{should therefore be ignored}.
+    
+    Otherwise, the general behavior of the system is exactly as expected.
+    From $50$ to $150$ virtual clients a quasi-linear growth is observed, and after that a saturation point appears to be reached.
+    Anyway, it is clear that starting already from $350$ virtual clients, irrespective of the number of threads, the system becomes quite unstable.
+    This fact is supported by the variance, which gets larger and larger for each number of threads, as the number of virtual clients increases.
+    Therefore it can be safely assumed that the optimum point lies somewhere between $150$ and $350$ virtual clients.
+    
+    Regarding the number of threads in the thread pool, there is a clear gap between $8$ and all other configurations.
+    In fact, in the region of interest from $150$ to $350$ virtual clients, the throughput seems to reach similar values for all configurations of $16,24,32$ and $40$ threads.
+    But this also implies that a point where having more threads does not increase the performance is reached.
+    In fact, almost always, the throughput with $40$ threads is less than the throughput with $16,24$, or $32$ thread.
+    Therefore, the search space for the number of threads can be safely reduced to $16,24,32$.
+\end{ana}
+
+\subsubsection{\gr{Run 2}: Seeking Confirmation and Reducing The Search Space}
+
+The configuration of this run is twice as granular as the previous in the number of virtual clients, but the search is only up to $350$.
+For the number of threads, only the values $16,24$, and $32$ are considered.
+The result of this run of the experiment is summarized in Figure~\ref{fig:tps2}.
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[scale=\plotscale]{../../log/experiments/\tpssnd/tps.pdf}
+    \caption{Throughput of \gr{\bf Run 2} of the maximum throughput experiment.}
+    \label{fig:tps2}
+\end{figure}
+
+\begin{hyp}
+    Same as Hypothesis~\ref{hyp:run1}.
+\end{hyp}
+\begin{ana}
+    The growth of the throughput is as expected (see analysis of Hypothesis~\ref{hyp:run1}).
+    Due to the increased granularity, it emerges that the optimal point is localized at around $250$ virtual clients, and it is almost identical for all numbers of threads.
+    The result of this run allows to further shrink the search space to the interval $200,300$ for the number of virtual clients.
+\end{ana}
+
+\subsubsection{\bl{Run 3}: Close-up Around the Optimal Point}
+
+For this run, the number of virtual clients has been set from $200$ to $300$ with a step of $20$, with the hope of having peak somewhere in the middle (as suggests the previous run).
+Since from the previous run it also emerged that $16,24$, and $32$ threads yield very similar throughput values in general, in this run only $16$ and $24$ threads are considered for the thread pool.
+The result of this run of the experiment is summarized in Figure~\ref{fig:tps3}.
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[scale=\plotscale]{../../log/experiments/\tpstrd/tps.pdf}
+    \caption{Throughput of \bl{\bf Run 3} of the maximum throughput experiment.}
+    \label{fig:tps3}
+\end{figure}
+
+\begin{hyp}
+    There should be a peak in the throughput at about $250$ virtual clients, with one of the two possible values for the thread pool size resulting in a better performance.
+\end{hyp}
+\begin{ana}
+    Unfortunately, Figure~\ref{fig:tps3} suggests that the hypothesis should be rejected.
+    In fact, neither there is an evident peak in the middle of the graph, nor does one of the two numbers of threads always dominate the performance of the other.
+    Overall, Figure~\ref{fig:tps3} supports the previous hypothesis that in this interval a saturation point is reached, but also outlines that starting from $200$ virtual clients, the change is very small, and it is not clear whether it is for the better or the worst.
+    For all those reasons, since a minimal configuration is sought, the optimal number of virtual clients should be put at $200$ and the optimal number of threads at $16$.
+\end{ana}
+
+\begin{comment}
+\subsection{Empirical Justification of the Optimal Configuration}
+
+From the plot resulting from the baseline experiment performed in the first milestone, an upper bound on the throughput for two clients interacting with one server and no middleware can be put at about $35\,000$ requests per second.
+Moreover, in that milestone as empirical overhead for the middleware, a $77\%$ \emph{decrease} in throughput was estimated.
+An upper bound for the throughput of five clients connected to the middleware can thus be estimated as
+\[(35\,000-0.77\cdot35\,000)\cdot2.5=20\,125.\]
+From Fiures~\ref{fig:tps1},~\ref{fig:tps2}, and \ref{fig:tps3}, this upper bound seems to be pretty accurate, also considering that the modification made to the middlewars (reported in Appendix~\ref{app:code}) resulted in a worst performance.
+\end{comment}
+
+\subsection{Optimal Configuration}
+
+From the previous analyses, it emerged that the maximum throughput achieved by the system consists of about $16\,000$ requests per second for this setup, but of course this number has to be taken with a grain of salt, since it is already clear from the above plots that the network introduces a lot of bias (for some runs, the throughput is constantly higher than in other runs).
+
+But the most interesting result of the previous analyses, is \emph{when} this maximum throughput is achieved for this setup.
+\bl{\bf Run 3} did not give any gain of information, thus relying on the results of \gr{\bf Run 2} instead, this \emph{minimal} point can be safely placed at about
+\begin{center}
+    \framebox[1.1\width]{\!\!\!\b{200 virtual clients and 16 threads.}\!\!\!}
+\end{center}
+This is also supported by Table~\ref{tab:03-percs}, generated using \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/03_opt}, which reports the percentiles of $\bar\mu$ for $T=16,24$ threads and $150,200,250$ virtual clients.
+The row corresponding to the chosen configuration has been colored in blue, and it can be seen that it is stable and better than any setup with 150 virtual clients.
+%Comparing this to the other rows, it can be seen that the chosen configuration is more stable than a configuration with $150$ virtual clients, and almost as stable as one 
+
+\vspace{-4mm} % HACK
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|c||c|c||c|c|c|c|c|}
+            \cline{5-9}
+            \multicolumn{4}{c|}{} & \multicolumn{5}{c|}{\b{Percentile}}\\ 
+            \hline
+            \b{\textit C} & \b{\textit T} & $\bm{\bar\mu}$ & $\bm{\bar\sigma}$ & \b{50th} & \b{80th} & \b{90th} & \b{95th} & \b{99th} \\
+            \hline
+            \hline
+            \multirow{2}{*}{\bf 150} & \b{16} & $15\,321.33$ & $551.31$ & $15\,415$ & $15\,927$ & $16\,288$ & $16\,385$ & $16\,869$ \\
+            \cline{2-9}
+            & \b{24} & $15\,357.75$ & $529.41$ & $15\,497$ & $15\,968$ & $16\,214$ & $16\,471$ & $16\,716$ \\
+            \hline
+            \hline
+            \multirow{2}{*}{\bf 200} & \b{16} & \bl{$15\,624.83$} & \bl{$639.44$} & \bl{$15\,704$} & \bl{$16\,439$} & \bl{$16\,649$} & \bl{$16\,840$} & \bl{$17\,163$} \\
+            \cline{2-9}
+            & \b{24} & $15\,602.28$ & $598.77$ & $15\,711$ & $16\,175$ & $16\,396$ & $16\,504$ & $16\,951$ \\
+            \hline
+            \hline
+            \multirow{2}{*}{\bf 250} & \b{16} & $15\,776.90$ & $662.85$ & $15\,754$ & $16\,482$ & $16\,874$ & $17\,205$ & $17\,842$ \\
+            \cline{2-9}
+            & \b{24} & $15\,777.95$ & $568.35$ & $15\,851$ & $16\,406$ & $16\,678$ & $16\,882$ & $17\,466$ \\
+            \hline
+        \end{tabular}
+    }
+    \caption{Mean, standard deviation, and percentiles of throughput for points of interest.}
+    \label{tab:03-percs}
+\end{table}
+
+\vspace{-4mm} % HACK
+
+\subsection{Detailed Breakdown of Time Spent in The Middleware}
+\label{ssec:03_breakdown}
+
+In this section a detailed breakdown of the time spent by the requests in the middleware for the optimal configuration found above is presented.
+All the table values and plots are generated by the script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/03_breakdown}.
+The script first filters out only the entries relative to \t{GET} operations from the middleware log file for the selected configuration from \gr{\bf Run 2}.
+Then, since the stable phase is assumed to lie in the middle third of the runtime of the clients, only the middle third of the \t{GET} entries is taken.
+(Note that the entries are sampled every 100.)
+Since the experiment is run with 4 repetitions for each configuration, the middle thirds of each repetition are successively put together, and finally mean, standard deviation, $50$th, $80$th, $90$th, $95$th, and $99$th percentiles are taken from this aggregated list of entries.
+These values are summarized in Table~\ref{tab:breakdown} for each of the timing reported by the middleware, i.e.,
+\begin{equation}
+    \label{eqn:times}
+    \Ttot\doteq\Tleft-\Tarr,\;\Tque\doteq\Tdeq-\Tenq,\;\text{and}\;\Tsrv\doteq\Trecv-\Tsent,
+\end{equation}
+Figure~\ref{fig:breakdown} shows the empirical distribution of these timings obtained by the samples of this run (Figures \ref{fig:breakdown-tot} to \ref{fig:breakdown-srv}), as well as a graph showing all the samples sorted from smallest to largest (Figure~\ref{fig:breakdown-srt}).
+From the latter, any percentile for the three timings can be directly read.
+Note that in all the four graphs, times larger than $20\,000\,\mu s$ have been cut out.
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|l||c|c||r|r|r|r|r|}
+            \cline{4-8}
+            \multicolumn{3}{c|}{} & \multicolumn{5}{c|}{\b{Percentile}}\\ 
+            \hline
+            \b{Times} & \b{Mean} & \b{Std. Dev.} & \b{50th} & \b{80th} & \b{90th} & \b{95th} & \b{99th} \\
+            \hline
+            \hline
+            \b{Total ($\Ttot$)} & $4\,262.95$ & $9\,307.09$ & $1\,302$ & $8\,072$ & $8\,910$ & $9\,826$ & $18\,023$ \\
+            \hline
+            \b{Queue ($\Tque$)} & $1\,198.56$ & $3\,871.07$ & $28$ & $675$ & $6\,609$ & $7\,993$ & $10\,278$ \\ 
+            \hline
+            \b{Server ($\Tsrv$)} & $3\,009.18$ & $8\,408.58$ & $894$ & $7\,386$ & $7\,782$ & $8\,125$ & $10\,363$ \\ 
+            \hline
+        \end{tabular}
+    }
+    \caption{Mean, standard deviation, and percentiles of times (in $\mu s$) spent in the middleware for the chosen optimal configuration of $200$ virtual clients and $16$ threads.}
+    \label{tab:breakdown}
+\end{table}
+
+\begin{figure}[!h]
+    \newcommand\wdt{7.7cm}
+    \centering
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/03_plots/perc_all.pdf}
+        \caption{Sorted timings for percentiles.}\label{fig:breakdown-srt}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/03_plots/dist_tot.pdf}
+        \caption{Empirical distribution of \b{total} time $\Ttot$.}\label{fig:breakdown-tot}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/03_plots/dist_que.pdf}
+        \caption{Empirical distribution of \b{queue} time $\Tque$.}\label{fig:breakdown-que}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/03_plots/dist_srv.pdf}
+        \caption{Empirical distribution of \b{server} time $\Tsrv$.}\label{fig:breakdown-srv}
+    \end{subfigure}
+    \caption{Breakdown of time spent in the middleware.}
+    \label{fig:breakdown}
+\end{figure}
+
+\begin{hyp}
+    Each request should spend a relatively small amount of time in the queues, and the time spent in the servers should dominates the total time.
+\end{hyp}
+\begin{ana}
+    From the means in Table~\ref{tab:breakdown}, it is already clear that the time spent by the requests in the servers dominates the total time.
+    Standard deviation in this case results to be a poor measure, but looking at the percentiles, up to the $80$th the difference between $\Tque$ and $\Ttot,\Tsrv$ is still hugely marked.
+    At higher percentiles this is not true anymore, as the time spent in the queue seems to equal that spent in the server.
+    %A reason for this, might be that (the few) requests taking exceptional long times in the server block other incoming requests in the queues.
+    A reason for this, might be that requests taking longer times in the server block other incoming requests in the queues.
+    
+    It is interesting to note that the times spent by the requests can be roughly grouped into two distinct intervals, centered around about $1\,000$ and $7\,500$ $\mu s$.
+    This is clearly seen in Figures \ref{fig:breakdown-tot} and \ref{fig:breakdown-srv} for $\Ttot$ and $\Tsrv$, respectively, where two net spikes can be observed.
+    Note that the spike is much less marked for $\Tque$ in Figure~\ref{fig:breakdown-que}, in support of the hypothesis that $\Tsrv$ dominates.
+    Also note that Figure~\ref{fig:breakdown-que} suggests that request usually spend very short times in the queues, since a peak around zero is observed.
+    The second much smaller peak around $7\,500\,\mu s$ is can be explained by the same reasoning outlined above.
+    %Figure~\ref{fig:breakdown-srt} also gives a clear indication of this fact, as ``jumps'' for all timings are visible.
+\end{ana}
+
+\task{
+Find the highest throughput of your system for 5 servers with no replication and a read-only workload configuration. What is the minimum number of threads and clients (rounded to multiple of 10) that together achieve this throughput? Explain why the system reaches its maximum throughput at these points and show how the performance changes around these configurations. Provide a detailed breakdown of the time spent in the middleware for each operation type.
+}
+
+\clearpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Effect of Replication}\label{sec:repl-eff}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The aim of this experiment is to explore how the behavior of the system changes for a 5\%-write workload with $S=3,5$ and $7$ server back-ends and replication factors $R=1$ (no replication), $R=\ceil{S/2}$ (replicate to half), and $R=S$ (write to all).
+The impact on both \t{SET} and \t{GET} operations is analyzed separately.
+
+\subsection{Experimental Setup}
+
+The setup of the experiment is outlined in Table~\ref{tab:exp4}.
+Based on the results of the previous experiment, $70$ virtual clients for each of the three client machine have been chosen, so that the effective number of virtual clients connecting to the middleware is close\footnote{The script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/04_5x40_vs_3x70} tests whether $5$ physical clients with $40$ virtual clients each yield similar throughput as $3$ physical clients with $70$ virtual clients each; this is confirmed by the logs from \hyperref[f:5vs3]{\t{5vs3}} which when fed to the script report very similar mean for the throughput in the stable phase: $15\,135.4$ for $5$ clients and $15\,002.1$ for $3$.} to the approximative optimum of $200$.
+Also the optimal value of $16$ threads has been adopted.
+The important parameters varied throughout the experiment are marked in bold.
+The experiment is carried out by the script located at  \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/experiments/04_replication_effect}, which collects all the \t{memaslap} and middleware outputs (\t{*.log}, inclusive repetitions). %, the extracted throughput data (\t{tps.data}), and also produces plots of the latter.
+
+\begin{table}[!h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|c|}
+            \hline \b{Servers} & (\b{\textit S\,=\,3,\,5,\,7}) $\times$ A2 \\ 
+            {Threads / server machine} & 1 \\ 
+            \hline\hline \b{Clients} & 3 $\times$ A2 \\ 
+            {Virtual clients / machine} &  70 \\ 
+            {Keys size} & 16 Bytes \\
+            {Values size} & 128 Bytes \\
+            {Writes} & 5\% \\
+            %{Reads} & 95\% \\
+            {Overwrite proportion} & 90\% \\
+            %{Window size} & 1k \\
+            {Statistics} & 1 Second \\
+            \hline\hline \b{Middleware} & 1 $\times$ A4 \\ 
+            {Pool threads} & 16 \\ 
+            {Replication} & \b{1,\,$\lceil\b{\textit S}/\b2\rceil$,\,\textit S} \\ 
+            \hline\hline {Runtime $\times$ repetitions} & 50 Seconds $\times$ 4 \\ 
+            {Log files} & \hyperref[f:repl]{\t{repl-eff}} \\
+            \hline 
+        \end{tabular}
+    }
+    \caption{Replication effect experiment setup.}
+    \label{tab:exp4}
+\end{table}
+
+\subsection{Analyses}
+
+This section presents the results of some analysis carried out on the log files generated during the experiment.
+First, the log files of the \t{memaslap} clients are analyzed, and the throughput of the two operations \t{GET} and \t{SET} are compared for the different setups.
+Then a more detailed analysis of the time spent inside the middleware by %both operations
+the requests
+is carried out from the middleware's logs.
+
+%\subsubsection{Throughput From \t{memaslap} Logs}
+\subsubsection{Impact on \t{SET}s and \t{GET}s}
+
+In order to investigate how the throughput of the \t{SET} and \t{GET} operations is affected by the changes in the configuration, the output of the \t{memaslap} clients has been first analyzed with the script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/04_clients}.
+For each of the $9$ different configurations, the \emph{mean} $\bar\mu$ and \emph{standard deviation} $\bar\sigma$ of the throughput has been calculated from samples $10$ through $40$ (in order to avoid warm-up and cool-down phases) of the clients' logs according to (\ref{eqn:avgstd}).
+The results of the analysis are summarized in Figure~\ref{fig:04_clients}, which shows a comparison of the effect of the configuration of \t{SET} and \t{GET} operations.
+Note that in order to better visualize the data, the scale of the throughput axis is different for the two graphs.
+
+\begin{figure}[!h]
+    \newcommand\wdt{7.7cm}
+    \centering
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/04_plots/04_clients_Set.pdf}
+        \caption{Effect of replication on \t{SET}.}\label{fig:04_clients-set}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/04_plots/04_clients_Get.pdf}
+        \caption{Effect of replication on \t{GET}.}\label{fig:04_clients-get}
+    \end{subfigure}
+    \caption{Analysis of \t{memaslap} logs for replication effect experiment.}
+    \label{fig:04_clients}
+\end{figure}
+
+\begin{hyp}
+    Increasing the replication factor should worsen the throughput of \t{SET} requests, but let more or less unaltered that of \t{GET} requests.
+\end{hyp}
+\begin{ana}
+    Figure~\ref{fig:04_clients} reveals that indeed there is a loss in performance in terms of throughput for the \t{SET} requests as the replication factor increases, but the hypothesis must be partially rejected, since it is clear that \t{GET} requests are affected as well.
+    Moreover, %without the need for any calculation, 
+    comparing Figure~\ref{fig:04_clients-set} and Figure~\ref{fig:04_clients-get} it is evident that the relative decrease is the same for the two operations. %, which is unexpected.
+    This fact is also is supported by Table~\ref{tab:ex2ratios}, computed using the script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/04_decrease}, which summarizes the performance loss\footnote{If $a$ is the base throughput and $b$ the target throughput for which we want to compute the loss $x$ from $a$, then $a-x\cdot a=b$, and so the values in the table are computed according to $x=1-b/a$.} as a function of the increase of the replication factor for each configuration from $1$ to $\ceil{S/2}$ and $S$.
+    The differences between \t{SET}s and \t{GET}s are outlined in bold, and it is striking to note that the largest is of only $0.02\%$.
+    
+    But there is an obvious reason for this partially unexpected behavior: \t{GET} requests are affected too because \t{memaslap}, by design, first sends \t{SET} requests for a particular value, and then sends \t{GET} requests on that value only once it receives the notification that is was stored.
+    This clearly artificially reduces the performance of \t{GET} requests too.
+\end{ana}
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \begin{tabular}{|c||c|c||c|c||c|c|}
+            \cline{2-7}
+            \multicolumn{1}{c|}{} & \multicolumn{2}{c||}{\b{\textit S=3}} & \multicolumn{2}{c||}{\b{\textit S=5}} & \multicolumn{2}{c|}{\b{\textit S=7}} \\ 
+            \cline{2-7}
+            %\b{Operation}
+            \multicolumn{1}{c|}{} & $\lceil$\b{\textit S/2}$\rceil$ & {\b{\textit S}} & $\lceil$\b{\textit S/2}$\rceil$ & {\b{\textit S}} & $\lceil$\b{\textit S/2}$\rceil$ & {\b{\textit S}} \\
+            \hline
+            \hline
+            \t{SET} & $2.4\b0\%$ & $5.3\b4\%$ & $0.9\b7\%$ & $3.2\b9\%$ & $1.18\%$ & $3.67\%$ \\
+            \hline
+            \t{GET} & $2.4\b2\%$ & $5.3\b6\%$ & $0.9\b5\%$ & $3.2\b8\%$ & $1.18\%$ & $3.67\%$ \\
+            \hline
+        \end{tabular}
+    }
+    \caption{Decrease of throughput from $R=1$.}
+    \label{tab:ex2ratios}
+\end{table}
+
+\subsubsection{Most Expensive Operation}
+
+In this section the length taken by %each operation
+requests
+inside the middleware as the replication factor grows is investigated.
+Since from the previous analysis it emerged that \t{SET}s and \t{GET}s behave similarly, and also in order to keep the analysis contained, both operations are considered together.
+The information is extracted from the logs of the middleware.
+Referring to (\ref{eqn:times}), we introduce the timing
+\[\Tpro\doteq\Ttot-(\Tque+\Tsrv)\]
+which corresponds to the time taken by the middleware to \emph{process} a specific request.
+Because of how the timestamps are taken in the middleware, as defined $\Tpro$ is exactly the time from when the request is received to when it is put into a queue.
+Therefore it accounts for the time necessary to \emph{interpret} (distinguish between \t{SET} and \t{GET} requests), \emph{hash} (determine the right server), and \emph{address the request} (put it on the correct queue jointly defined by the operation and the hash value).
+
+In this section the most expensive operation inside the middleware, as the replication factor increases, is sought.
+The operations (or stages) considered are those corresponding to the times
+%\[\Tpro,\;\Tque,\;\text{and}\;\Tsrv,\]
+$\Tpro$, $\Tque$, and, $\Tsrv$,
+which if summed up, correspond to the total time taken by a request inside the middleware.
+The script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/04_breakdown} generates means, standard deviation, and percentiles of those times, summarized in Table~\ref{tab:04-percs}, and the three plots in Figure~\ref{fig:04_mw} which visualize the average time spent in each of the three stages.
+
+%\vspace{-5mm} % HACK
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|c|c||r|r||r|r|r|r|r|}
+            \cline{6-10}
+            \multicolumn{5}{c|}{} & \multicolumn{5}{c|}{\b{Percentile}}\\ 
+            \hline
+            \b{\textit S} & \b{\textit R} & \b{Time} & \multicolumn{1}{c|}{$\bm{\bar\mu}$} & \multicolumn{1}{c||}{$\bm{\bar\sigma}$} & \b{50th} & \b{80th} & \b{90th} & \b{95th} & \b{99th} \\
+            \hline
+            \hline
+            \multirow{9}{*}{\b3} & \multirow{3}{*}{\b1} & $\Tpro$ & $39.02$ & $304.36$ & $15$ & $20$ & $25$ & $37$ & $219$ \\
+            %\cline{3-10}
+            & & $\Tque$ & $2\,818.06$ & $3\,012.74$ & $1\,764$ & $4\,944$ & $7\,362$ & $8\,989$ & $12\,248$ \\
+            %\cline{3-10}
+            & & $\Tsrv$ & $1\,934.81$ & $2\,020.09$ & $1\,187$ & $2\,691$ & $4\,446$ & $6\,731$ & $8\,835$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{$\lceil$\b{\textit S/2}$\rceil$} & $\Tpro$ & $49.25$ & $434.81$ & $15$ & $20$ & $24$ & $39$ & $466$ \\
+            %\cline{3-10}
+            & & $\Tque$ & $2\,621.82$ & $2\,922.25$ & $1\,559$ & $4\,613$ & $7\,117$ & $8\,743$ & $11\,653$ \\
+            %\cline{3-10}
+            & & $\Tsrv$ & $1\,922.03$ & $1\,958.81$ & $1\,175$ & $2\,636$ & $4\,496$ & $6\,782$ & $8\,617$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{\b{\textit S}} & $\Tpro$ & $46.69$ & $405.06$ & $15$ & $20$ & $24$ & $37$ & $322$ \\
+            %\cline{3-10}
+            & & $\Tque$ & $2\,548.80$ & $2\,916.73$ & $1\,457$ & $4\,453$ & $7\,185$ & $8\,787$ & $11\,803$ \\
+            %\cline{3-10}
+            & & $\Tsrv$ & $1\,938.52$ & $1\,977.59$ & $1\,186$ & $2\,655$ & $4\,538$ & $6\,863$ & $8\,736$ \\
+            \hline
+            \hline
+            \multirow{9}{*}{\b5} & \multirow{3}{*}{\b1} & $\Tpro$ & $42.44$ & $364.10$ & $16$ & $20$ & $25$ & $38$ & $322$ \\
+            & & $\Tque$ & $1\,044.94$ & $2\,396.89$ & $331$ & $1\,438$ & $2\,971$ & $4\,967$ & $8\,584$ \\
+            & & $\Tsrv$ & $2\,144.32$ & $2\,632.02$ & $1\,302$ & $3\,253$ & $5\,193$ & $7\,003$ & $9\,105$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{$\lceil$\b{\textit S/2}$\rceil$} & $\Tpro$ & $43.90$ & $396.77$ & $16$ & $20$ & $25$ & $38$ & $315$ \\
+            & & $\Tque$ & $1\,138.52$ & $2\,241.91$ & $315$ & $1\,556$ & $3\,469$ & $5\,754$ & $9\,261$ \\
+            & & $\Tsrv$ & $2\,214.56$ & $2\,278.32$ & $1\,310$ & $3\,343$ & $5\,677$ & $7\,290$ & $9\,909$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{\b{\textit S}} & $\Tpro$ & $43.88$ & $361.35$ & $16$ & $20$ & $25$ & $37$ & $329$ \\
+            & & $\Tque$ & $1\,124.60$ & $2\,020.97$ & $306$ & $1\,538$ & $3\,398$ & $5\,875$ & $9\,027$ \\
+            & & $\Tsrv$ & $2\,303.63$ & $2\,302.26$ & $1\,375$ & $3\,569$ & $5\,929$ & $7\,378$ & $9\,754$ \\
+            \hline
+            \hline
+            \multirow{9}{*}{\b7} & \multirow{3}{*}{\b1} & $\Tpro$ & $46.17$ & $352.89$ & $16$ & $21$ & $26$ & $39$ & $435$ \\
+            & & $\Tque$ & $536.37$ & $1\,270.64$ & $60$ & $671$ & $1\,349$ & $2\,506$ & $6\,749$ \\
+            & & $\Tsrv$ & $2\,042.30$ & $2\,181.86$ & $1\,137$ & $3\,086$ & $5\,426$ & $7\,127$ & $9\,364$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{$\lceil$\b{\textit S/2}$\rceil$} & $\Tpro$ & $41.62$ & $320.87$ & $16$ & $21$ & $25$ & $37$ & $365$ \\
+            & & $\Tque$ & $617.66$ & $1\,402.43$ & $92$ & $764$ & $1\,602$ & $3\,051$ & $7\,369$ \\
+            & & $\Tsrv$ & $2\,193.53$ & $2\,296.09$ & $1\,208$ & $3\,536$ & $6\,037$ & $7\,310$ & $9\,493$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{\b{\textit S}} & $\Tpro$ & $49.27$ & $415.18$ & $16$ & $21$ & $26$ & $40$ & $398$ \\
+            & & $\Tque$ & $660.74$ & $1\,430.30$ & $119$ & $825$ & $1\,671$ & $3\,243$ & $7\,460$ \\
+            & & $\Tsrv$ & $2\,313.83$ & $2\,335.81$ & $1\,357$ & $3\,646$ & $5\,954$ & $7\,397$ & $10\,125$ \\
+            \hline
+        \end{tabular}
+    }
+    \caption{Mean, standard deviation, and percentiles of times in the middleware in $\mu s$.}
+    \label{tab:04-percs}
+\end{table}
+
+\begin{hyp}
+    As the number of servers increases the load of each of them should decrease, and therefore also the times spent by requests in the middleware should decrease.
+    But as replication is increased, for a fixed number of servers, an increase on the time spent in the middleware should be observed, specifically in the queue and in the server times.
+\end{hyp}
+\begin{ana}
+    From Table~\ref{tab:04-percs} it is clear that the time needed to process each incoming request, $\Tpro$, stays almost always the same.
+    In fact its means for the various configuration do not vary too much.
+    But they appear to slightly increase for fixed number of servers as the replication factor is increased, but this is not always true (for $S=3$ from $R=\ceil{S/2}$ to $R=S$, $S=5$ from $R=\ceil{S/2}$ to $R=S$, and $S=7$ from $R=1$ to $R=\ceil{S/2}$, they decrease).
+    Looking at the percentiles, it emerges that for the $50$th and $80$th the maximal difference between any configuration is of only $1\,\mu s$, and for $90$th and $95$th of only $3\mu s$.
+    It is a bit larger for the $99$th percentile, with differences of up to $200\,\mu s$, but fixing the number of servers and varying the replication factor it is not true that it also increases (rather, it both increases and decreases).
+    Therefore, in line with what intuition would also suggest, $\Tpro$ is \emph{not} affected by the increase in the replication factor.
+    
+    For $\Tque$ and $\Tsrv$ it emerges from Table~\ref{tab:04-percs} and Figure~\ref{fig:04_mw} that for $S=3$, on average, requests take more time in the in the queues than in the servers, while the opposite holds for $S=5,7$.
+    This is explainable by the fact that with few servers, each of them receives more load, as hypothesised.
+    This translates into having more requests waiting in the queues on average.
+    
+    From Table~\ref{tab:04-percs}, it also results that with $S=3$, the time spent in the queue tends to slightly decrease as the replication factor is increased.
+    This is evident by looking at the mean values of $\Tque$, and it is also partly confirmed by the percentiles: for the $50$th and the $80$th this is true, while for the $90$th, $95$th, and $99$th, there is a net decrease from $R=1$ to $R=\ceil{S/2}$, but for $R=\ceil{S/2}$ and $R=S$ the values increase a bit (while still being lower for $R=\ceil{S/2}$ than for $R=1$).
+    On the other hand, for $S=5,7$ the opposite holds: $\Tque$ appears to increase as the replication factor is increased.
+    The means support this fact clearly, and for $S=7$ \emph{all} the percentiles confirm this.
+    For $S=5$ instead, full replication ($R=S$) seems to impact the queue time less than half replication ($R=\ceil{S/2}$), but again full replication affects the queue more than no replication.
+    
+    For $\Tsrv$, note that for $S=3$ its means are all about the same for the three different replication factors, while for $S=5,7$ they increase as $R$ increases.
+    The percentiles of $\Tsrv$ also speak in favor of the server time being unaffected by replication for $S=3$, probably because of the high load to which the servers already undergo.
+    For $S=5,7$, the percentiles indicate that the effect of replication is strong when at half, but from half to full the effect is attenuated; in fact some percentiles show lower values for full replication than for half, contrary to what the means suggest.
+    
+    All in all, it emerges that the effect of replication on the various operations inside the middleware is strongly affected by the number of servers.
+    For few servers ($S\approx3$), it results that higher replication factors positively affect the efficiency of the middleware.
+    On the contrary, for larger numbers of servers, the requests spend more time in the servers, as replication increases, while queue times are just slightly affected (and this as a consequence of the increase in server time).
+    Therefore, it can be concluded that the operation most affected by the increase of the replication factor, is server time.
+    This is also in line with the fact that internally, for \t{SET} requests the middleware considers the server time as the time from when the request is sent to the primary server to when the last response arrived from \emph{all} the replication servers.
+    %This is due to the high load to which the servers are subject.
+    %By increasing the number of servers, they become less loaded, and this results in more requests being processed.
+    %This in turn fills the queues, where requests take more time as replication is increased.
+\end{ana}
+
+\begin{figure}[!h]
+    \newcommand\wdt{6.5cm} % 7.7
+    \centering
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/04_plots/04_breakdown_means_3.pdf}
+        \caption{Middleware average times for $S=3$ servers.}\label{fig:04_mw-3}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/04_plots/04_breakdown_means_5.pdf}
+        \caption{Middleware average times for $S=5$ servers.}\label{fig:04_mw-5}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/04_plots/04_breakdown_means_7.pdf}
+        \caption{Middleware average times for $S=7$ servers.}\label{fig:04_mw-7}
+    \end{subfigure}
+    \caption{Analysis of \t{memaslap} logs for replication effect experiment.}
+    \label{fig:04_mw}
+\end{figure}
+
+\subsubsection{Scalability}
+
+In this section the scalability of the system is compared to that of an ideal implementation.
+The latter is supposed to be a \emph{perfect load balancer}: assuming for a moment no replication ($R=1$), it is expected that if a total of $x$ requests are generated by the clients, each of the $S$ servers receives $\frac xS$ of them, on average.
+Taking into account replication is more involved, as some more sophisticated assumption on the ideal behavior of the writer thread would have to be made.
+But to keep things simple, here it is only assumed that the writer thread behaves perfectly asynchronously (which is not totally true, since the use of a timeout, as detailedly explained in the first report, only guarantees an ``artificial'' asynchronous mechanism).
+Nevertheless, it is still assumed that \t{SET} request are sent serially to all replication servers (so in particular, the asynchronous behavior only manifests explicitly when reading responses from the server).
+
+With these considerations in mind, it can be supposed that the load of each of the $S$ servers, for any replication factor $1\leq R\leq S$, and writes proportion $W\in[0,1]$ is
+\begin{equation}
+    \label{eqn:load}
+    \frac{WR\cdot x+(1-W)\cdot x}S=\frac xS+W\frac{R-1}S\cdot x.
+\end{equation}
+Therefore it is clear that as the number of servers $S$ is increased, the load per server diminishes, but having a replication factor $R$ larger than $1$ introduces an overhead of proportion $W\frac{R-1}S$ of the number $x$ of requests on the response time (which clearly is $0$ when $R=1$).
+%Note that for full replication, that is $R=S$, the formula for the load reduces to
+%\[\left(W+\frac{1-W}S\right)\cdot x.\]
+
+\begin{hyp}
+    Since the load for each server diminishes by increasing the number of servers, according to (\ref{eqn:load}), the throughput of the system should ideally also increase.
+    Moreover, still according to (\ref{eqn:load}), a decrease should be observed when the replication factor is increased.
+\end{hyp}
+\begin{ana}
+    The first part of the hypothesis can be quickly rejected by looking at Figure~\ref{fig:04_clients}.
+    It is clear that, independently of the replication factor, the throughput decreases as $S$ increases.
+    This is explainable by taking into consideration, that in reality having more servers introduces considerable complexity, both in terms of network connections and needed resources: the number of parallel connections grows linearly with the number of servers for fixed replication factor, and since bandwidth is finite, a saturation point is eventually reached; also, having more servers means more threads in the middleware, and each thread takes a considerable portion of CPU time, which is also finite.
+    
+    Instead, the second part of the hypothesis is clearly in line with the observations.
+\end{ana}
+
+\task{
+Explore how the behavior of your system changes for a 5\%-write workload with S=3,5 and 7 server backends and the following three replication factors:
+\begin{itemize} 
+\item Write to $1$ (no replication) 
+\item Write to $\ceil{\frac{S}{2}}$ (half) 
+\item Write to all 
+\end{itemize}
+Answer at least the following questions: Are \texttt{get} and \texttt{set} requests impacted the same way by different setups? If yes/no, why? Which operations become more expensive inside the middleware as the configuration changes? How does the scalability of your system compare to that of an ideal implementation? Provide the graphs and tables necessary to support your claims.
+}
+
+\clearpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Effect of Writes}\label{sec:writes-eff}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The aim of this experiment is to study the changes in throughput and response time of the system as the percentage of write operations increases from $1\%$ through $5\%$ to $10\%$.
+
+\subsection{Experimental Setup}
+
+The setup of the experiment is outlined in Table~\ref{tab:exp5}.
+Again the optimal configuration of $200$ virtual clients and $16$ threads found in Section~\ref{sec:max-tps} has been adopted.
+The important parameters varied throughout the experiment are marked in bold.
+The experiment is carried out by the script located at  \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/experiments/05_writes_effect}, which collects all the \t{memaslap} and middleware outputs (\t{*.log}, inclusive repetitions).
+
+\begin{table}[!h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|c|}
+            \hline \b{Servers} & (\b{\textit S\,=\,3,\,5,\,7}) $\times$ A2 \\ 
+            {Threads / server machine} & 1 \\ 
+            \hline\hline \b{Clients} & 3 $\times$ A2 \\ 
+            {Virtual clients / machine} &  70 \\ 
+            {Keys size} & 16 Bytes \\
+            {Values size} & 128 Bytes \\
+            {Writes} & \b{1\%,\,5\%,\,10\%} \\
+            %{Reads} & 95\% \\
+            {Overwrite proportion} & 90\% \\
+            %{Window size} & 1k \\
+            {Statistics} & 1 Second \\
+            \hline\hline \b{Middleware} & 1 $\times$ A4 \\ 
+            {Pool threads} & 16 \\ 
+            {Replication} & \b{1,\,\textit S} \\ 
+            \hline\hline {Runtime $\times$ repetitions} & 50 Seconds $\times$ 4 \\ 
+            {Log files} & \hyperref[f:wrt]{\t{wrt-eff}} \\
+            \hline 
+        \end{tabular}
+    }
+    \caption{Writes effect experiment setup.}
+    \label{tab:exp5}
+\end{table}
+
+\subsection{Analyses}
+
+This section presents the results of some analysis carried out on the log files generated during the experiment.
+
+\subsubsection{Performance}
+
+In this analysis, the changes in performance in terms of throughput and response time from the base case of $1\%$ write proportion has been investigated.
+The plots in Figure~\ref{fig:05_clients} are generated by the script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/05_clients}, and they summarize the values of average throughput and response time for the various configurations.
+Again, the standard deviation of the throughput has been computed according to \ref{eqn:avgstd}, while for response time the one provided by \t{memaslap} has been used.
+Finally, the relative changes as the write proportion is increased are summarized in Table~\ref{tab:ex3ratios}, and the values are generated by the script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/05_decrease}.
+
+\begin{figure}[!h]
+    \newcommand\wdt{7.7cm}
+    \centering
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/05_clients_TPS_one.pdf}
+        \caption{Throughput for $R=1$.}\label{fig:05_clients-tps1}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/05_clients_TPS_full.pdf}
+        \caption{Throughput for $R=S$.}\label{fig:05_clients-tpsS}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/05_clients_RT_one.pdf}
+        \caption{Response time for $R=1$.}\label{fig:05_clients-rt1}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/05_clients_RT_full.pdf}
+        \caption{Response time for $R=S$.}\label{fig:05_clients-rtS}
+    \end{subfigure}
+    \caption{Analysis of \t{memaslap} logs for writes effect experiment.}
+    \label{fig:05_clients}
+\end{figure}
+
+\begin{hyp}
+    As the proportion of writes increases, with no replication no substantial reduction of performance should be observed by increasing the number of servers, while with full replication this should be true instead.
+\end{hyp}
+\begin{ana}
+    From Figures~\ref{fig:05_clients-tps1} and \ref{fig:05_clients-rt1}, it can be seen that indeed the performance, as the write proportion is increased with no replication, is more or less the same for any number of servers.
+    The relative changes%\footnote{Again, the performance loss is computed according to $x=1-b/a$.}%\footnote{Again, if $a$ is the base performance measure and $b$ the target for which we want to compute the loss $x$ from $a$, then $a-x\cdot a=b$, and so the values in the table are computed according to $x=1-b/a$.} 
+    read from Table~\ref{tab:ex3ratios} confirm this.
+    In fact the values on the first and the third rows (for $R=1$) are relatively small (compared to the other two rows), and sometimes they are even negative (this counterintuitive result is probably due to the unreliability of the network).
+    Anyway, still for $R=1$, the biggest relative impact is registered with $3$ servers.
+    
+    In case of full replication ($R=S$), in line with the hypothesis, the performance worsen for all number of servers as the write proportion increases.
+    This is evident from Figures~\ref{fig:05_clients-tpsS} and \ref{fig:05_clients-rtS} and the number in the second and fourth rows of Table~\ref{tab:ex3ratios} also confirm this.
+    From these values it can also be observed that the impact is the largest for all number of servers when changing the writes from $1\%$ to $10\%$, but the largest impact when changing the writes from $1\%$ to $5\%$ is registered with $3$ servers ($9.44\%$ vs. $5.93\%$ and $6.18\%$).
+    
+    In summary, considering $R=S$, the biggest impact on performance relative to base case of $1\%$ writes proportion is seen with $S=5$ servers, the values confirming this are marked in bold in Table~\ref{tab:ex3ratios}, and are to be compared with the corresponding values on the other two columns.
+\end{ana}
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \begin{tabular}{|c|c||c|c||c|c||c|c|}
+            \cline{3-8}
+            \multicolumn{2}{c|}{} & \multicolumn{2}{c||}{\b{\textit S=3}} & \multicolumn{2}{c||}{\b{\textit S=5}} & \multicolumn{2}{c|}{\b{\textit S=7}} \\ 
+            \cline{3-8}
+            %\b{Measure} & $R$
+            \multicolumn{2}{c|}{} & $\bf 5\%$ & $\bf 10\%$ & $\bf 5\%$ & $\bf 10\%$ & $\bf 5\%$ & $\bf 10\%$ \\
+            \hline
+            \hline
+            \multirow{2}{*}{\bf Throughput} & {\b{\textit R=1}} & 0.62\% & 4.38\% & -1.70\% & 1.75\% & 0.22\% & 1.10\% \\
+            \cline{2-8}
+            & {\b{\textit R=\textit S}} & 8.56\% & 9.81\% & 5.54\% & \b{11.47\%} & 5.55\% & 8.85\% \\
+            \hline
+            \hline
+            \multirow{2}{*}{\bf Response time} & {\b{\textit R=1}} & 0.39\% & 4.21\% & -2.00\% & 1.34\% & 0.41\% & 1.13\% \\
+            \cline{2-8}
+            & {\b{\textit R=\textit S}} & 9.44\% & 10.70\% & 5.93\% & \b{13.17\%} & 6.18\% & 9.89\% \\
+            \hline
+        \end{tabular}
+    }
+    \caption{Decrease of performance from write proportion $1\%$.}
+    \label{tab:ex3ratios}
+\end{table}
+
+\subsubsection{Behavior of the System}
+
+In this section the behavior of the system is investigated with the help of the logs from the middleware.
+Since it was concluded in the previous section that the effect of writes is the starkest for full replication with $5$ servers for a $10\%$ writes proportion, only the corresponding logs are analyzed.
+Full replication was also selected because it represents a more ``realistic'' scenario.
+All the table values and plots are generated by the script located at \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/analyses/05_breakdown}.
+Since the stable phase is assumed to lie in the middle three-fifths of the runtime of the clients, only the middle three-fifths of the \t{SET} and \t{GET} entries is taken.
+(Note that the entries are sampled every 100 for both \t{SET} and \t{GET}.)
+Data for \t{SET}s and \t{GET}s is aggregated and presented is exactly as described in Section~\ref{ssec:03_breakdown}.
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|c|l||r|c||r|r|r|r|r|}
+            \cline{6-10}
+            \multicolumn{5}{c|}{} & \multicolumn{5}{c|}{\b{Percentile}}\\ 
+            \hline
+            \b{\b{\textit W}} & \b{Op.} & \b{Times} & \multicolumn{1}{c|}{\b{Mean}} & \multicolumn{1}{c||}{\b{Std. Dev.}} & \b{50th} & \b{80th} & \b{90th} & \b{95th} & \b{99th} \\
+            \hline
+            \hline
+            \multirow{6}{*}{\bf1\%} & \multirow{3}{*}{\bf\t{SET}} & \b{Total ($\Ttot$)} & $6\,662.51$ & $3\,017.97$ & $6\,812$ & $8\,975$ & $9\,845$ & $10\,650$ & $13\,019$ \\
+            && \b{Queue ($\Tque$)} & $274.73$ & $\;\;\,628.65$ & $32$ & $381$ & $542$ & $665$ & $1\,144$ \\ 
+            && \b{Server ($\Tsrv$)} & $6\,321.36$ & $2\,933.82$ & $6\,256$ & $8\,435$ & $9\,295$ & $10\,235$ & $12\,530$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{\bf\t{GET}} & \b{Total ($\Ttot$)} & $2\,928.73$ & $2\,909.80$ & $1\,673$ & $5\,535$ & $7\,540$ & $8\,802$ & $11\,400$ \\
+            && \b{Queue ($\Tque$)} & $949.20$ & $1\,863.64$ & $239$ & $1\,196$ & $2\,506$ & $5\,880$ & $8\,583$ \\ 
+            && \b{Server ($\Tsrv$)} & $1\,933.32$ & $2\,183.90$ & $1\,041$ & $2\,466$ & $6\,229$ & $7\,010$ & $8\,485$ \\ 
+            \hline
+            \hline
+            \multirow{6}{*}{\bf10\%} & \multirow{3}{*}{\bf\t{SET}} & \b{Total ($\Ttot$)} & $6\,066.56$ & $3\,636.92$ & $5\,951$ & $9\,067$ & $10\,180$ & $11\,678$ & $15\,608$ \\
+            && \b{Queue ($\Tque$)} & $217.79$ & \;\;\,$733.25$ & $24$ & $208$ & $503$ & $792$ & $2\,115$ \\ 
+            && \b{Server ($\Tsrv$)} & $5\,773.66$ & $3\,464.64$ & $5\,643$ & $8\,748$ & $9\,887$ & $11\,391$ & $14\,368$ \\
+            \cline{2-10}
+            & \multirow{3}{*}{\bf\t{GET}} & \b{Total ($\Ttot$)} & $3\,288.79$ & $3\,326.61$ & $1\,837$ & $6\,375$ & $8\,013$ & $9\,538$ & $13\,140$ \\
+            && \b{Queue ($\Tque$)} & $1\,008.37$ & $2\,089.87$ & $192$ & $1\,208$ & $2\,952$ & $6\,161$ & $9\,882$ \\ 
+            && \b{Server ($\Tsrv$)} & $2\,222.08$ & $2\,479.35$ & $1\,137$ & $3\,295$ & $6\,633$ & $7\,499$ & $9\,813$ \\ 
+            \hline
+        \end{tabular}
+    }
+    \caption{Mean, standard deviation, and percentiles of times (in $\mu s$) spent in the middleware by \t{SET} and \t{GET} requests $S=R=7$ and $W=1\%,10\%$ writes proportion.}
+    \label{tab:05_breakdown}
+\end{table}
+
+\begin{hyp}
+    Based on the result of the previous analysis on the logs from \t{memaslap}, it should be possible to confirm that changing the writes proportion from $1\%$ to $10\%$ for $S=R=5$ results in a significantly worst performance.
+\end{hyp}
+\begin{ana}
+    First of all, note that the empirical distributions in Figures~\ref{fig:05_breakdown-tot-set-1}-\ref{fig:05_breakdown-que-set-1} and \ref{fig:05_breakdown-tot-set-10}-\ref{fig:05_breakdown-que-set-10} look less ``nice'' because by design the middleware logs one every $100$ requests, separately for \t{SET} and \t{GET}, and therefore, since there are much less writes than reads, there are less samples for \t{SET}s to use to visualize the empirical distribution.
+    %Also, since for Figure~\ref{fig:05_breakdown-1} $W=1\%$ and for Figure~\ref{fig:05_breakdown-10} $W=10\%$, clearly the distributions  ,,, but the shape is what matters.
+    
+    Confronting the sub-figures of Figure~\ref{fig:05_breakdown-1} with the corresponding sub-figures of Figure~\ref{fig:05_breakdown-10}, it immediately seems that for the two configurations, the middleware actually behaves quite similarly, almost in contradiction with the hypothesis.
+    In fact, the distributions of the three timings for \t{GET} requests look extremely close, and even the two typical spikes appear to be at the same spot.
+    The distributions for \t{SET} requests unfortunately do not allow to say much, because they are likely to be imprecise due to the small sample population, but it seems as if the distribution is more uniform than for \t{GET}s.
+    
+    Looking at the means in Table~\ref{tab:05_breakdown}, it results that $\Ttot$ for \t{SET}s with $W=1\%$ is slightly larger than with $W=10\%$ ($6\,662.51\,\mu s$ vs. $6\,066.56\,\mu s$), while the converse it true for \t{GET}s ($2\,928.56\,\mu s$ vs. $3\,288.79\,\mu s$).
+    This might indicate the presence of a possible threshold, situated somewhere after $W=10\%$, at which write operation start becoming more expensive than read operations on average.
+    Note that even though $\Ttot$ for \t{SET}s decrease, apparently against the hypothesis, the increase of $\Ttot$ for \t{GET} is large enough so support the thesis that overall response time is larger for $W=10\%$.
+    In fact, a rough estimate of the mean response time for $W=1\%$ gives
+    \[1\%\cdot6\,662.51\,\mu s+99\%\cdot2\,928.73\,\mu s\approx2\,966.07\,\mu s,\]
+    while for $W=10\%$ it gives
+    \[10\%\cdot6\,066.56\,\mu s+90\%\cdot3\,288.79\,\mu s\approx3\,566.57\,\mu s,\]
+    in line with the hypothesis that performance decreases in average as $W$ is increased.
+    %But the important fact here is that the means speak completely against the hypothesis: it is expected that $\Ttot$ becomes larger when $W$ is increased for this configuration, not the contrary!
+    
+    To better understand the situation, it is necessary to turn the attention to percentiles.
+    Looking at Table~\ref{tab:05_breakdown} it emerges that $\Ttot$'s median ($50$th percentile) for \t{SET} requests is higher with $W=1\%$, like for its mean.
+    But already starting from the $80$th percentile, this is not true anymore: in fact for higher percentiles, $\Ttot$ of \t{SET}s is always higher for $W=10\%$, as hypotesized.
+    On the other hand, for $\Ttot$ of \t{GET}s, all the percentiles follow the behavior of the means, as they are all higher for $W=10\%$, as expected.
+    
+    Comparing Figures \ref{fig:05_breakdown-srt-set-1} and \ref{fig:05_breakdown-srt-set-10}, it is visible that for $W=10\%$ there are some exceptional outliers which take more time than the longest \t{SET} requests for $W=1$.
+    Also Table~\ref{tab:05_breakdown} speaks in favor of this fact: the respective $99$th percentiles have a $\sim2\,600\mu s$ difference, and for smaller percentiles the difference is considerably lower.
+    Therefore, the reduced performance when $W$ is increased is probably due to the increase on outliers in \t{SET} requests, which in turn slow down also \t{GET}s.
+    This might be explained by the fact that increasing the number of write operations, with full replication it is more and more probable that some responses are slower than other, and since $R=S$ implies that \t{SET}s take as long as a response from all replication servers is perceived, when a response takes exceptionally long to arrive it affects significantly the overall performance of the middleware on average.
+\end{ana}
+
+\begin{figure}[!h]
+    \newcommand\wdt{7.4cm}
+    \centering
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/perc_all_SET_1.pdf}
+        \caption{Sorted timings for percentiles of \t{SET}s.}\label{fig:05_breakdown-srt-set-1}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_tot_SET_1.pdf}
+        \caption{Distribution of \b{total} time $\Ttot$ for \t{SET}s.}\label{fig:05_breakdown-tot-set-1}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_que_SET_1.pdf}
+        \caption{Distribution of \b{queue} time $\Tque$ for \t{SET}s.}\label{fig:05_breakdown-que-set-1}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_srv_SET_1.pdf}
+        \caption{Distribution of \b{server} time $\Tsrv$ for \t{SET}s.}\label{fig:05_breakdown-srv-set-1}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/perc_all_GET_1.pdf}
+        \caption{Sorted timings for percentiles of \t{GET}s.}\label{fig:05_breakdown-srt-get-1}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_tot_GET_1.pdf}
+        \caption{Distribution of \b{total} time $\Ttot$ for \t{GET}s.}\label{fig:05_breakdown-tot-get-1}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_que_GET_1.pdf}
+        \caption{Distribution of \b{queue} time $\Tque$ for \t{GET}s.}\label{fig:05_breakdown-que-get-1}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_srv_GET_1.pdf}
+        \caption{Distribution of \b{server} time $\Tsrv$ for \t{GET}s.}\label{fig:05_breakdown-srv-get-1}
+    \end{subfigure}
+    \caption{Breakdown of time spent in the middleware for $1\%$ writes proportion.}
+    \label{fig:05_breakdown-1}
+\end{figure}
+
+\begin{figure}[!h]
+    \newcommand\wdt{7.4cm}
+    \centering
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/perc_all_SET_10.pdf}
+        \caption{Sorted timings for percentiles of \t{SET}s.}\label{fig:05_breakdown-srt-set-10}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_tot_SET_10.pdf}
+        \caption{Distribution of \b{total} time $\Ttot$ for \t{SET}s.}\label{fig:05_breakdown-tot-set-10}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_que_SET_10.pdf}
+        \caption{Distribution of \b{queue} time $\Tque$ for \t{SET}s.}\label{fig:05_breakdown-que-set-10}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_srv_SET_10.pdf}
+        \caption{Distribution of \b{server} time $\Tsrv$ for \t{SET}s.}\label{fig:05_breakdown-srv-set-10}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/perc_all_GET_10.pdf}
+        \caption{Sorted timings for percentiles of \t{GET}s.}\label{fig:05_breakdown-srt-get-10}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_tot_GET_10.pdf}
+        \caption{Distribution of \b{total} time $\Ttot$ for \t{GET}s.}\label{fig:05_breakdown-tot-get-10}
+    \end{subfigure}
+    \\\vspace{3mm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_que_GET_10.pdf}
+        \caption{Distribution of \b{queue} time $\Tque$ for \t{GET}s.}\label{fig:05_breakdown-que-get-10}
+    \end{subfigure}
+    \hspace{0.2cm}
+    \begin{subfigure}[t]{\wdt}
+        \centering
+        \includegraphics[width=\wdt]{../../scripts/analyses/05_plots/dist_srv_GET_10.pdf}
+        \caption{Distribution of \b{server} time $\Tsrv$ for \t{GET}s.}\label{fig:05_breakdown-srv-get-10}
+    \end{subfigure}
+    \caption{Breakdown of time spent in the middleware for $10\%$ writes proportion.}
+    \label{fig:05_breakdown-10}
+\end{figure}
+
+\task{
+In this section, you should study the changes in throughput and response time of your system as the percentage of write operations increases. Use a combination of 3 to 7 servers and vary the number of writes between 1\% and 10\% (e.g. 1\%, 5\% and 10\%). The experiments need to be carried out for the replication factors R=1 and R=all.  
+
+For what number of servers do you see the biggest impact (relative to base case) on performance? Investigate the main reason for the reduced performance and provide a detailed explanation of the behavior of the system. Provide the graphs and tables necessary to support your claims.
+}
+
+\clearpage
+\begin{appendices}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Modification of the Middleware Source Code}\label{app:code}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+After some considerations, a slight modification to the source code of the middleware has been performed.
+As outlined in the first report, the writer thread has been designed with the idea of avoiding \emph{busy waiting}.
+The reason behind this, was that en empiric loss of performance in terms of throughput was observed, when adopting busy waiting.
+Non-busy waiting is usually achieved by blocking the thread, but due to the inherent multiplicity of the points at which the writer thread should have been blocked (by queue polling \emph{and} by server data reading), a full blocking solution was avoided due to the expected high increase in complexity of the code.
+Instead, a more simple solution has been adopted: to block when polling the queue, but only for a certain amount of time.
+Using Java's \t{BlockingQueue}, this is achieved by invoking the method \t{queue.poll(long, java.util.concurrent.TimeUnit)}.
+Concretely, the timeout was set to $10$ milliseconds.
+But this was problematic, because from the middleware logs, it emerged that requests spend much smaller amounts of time in some parts of the middleware.
+Empirically, a lower-bound of $5$ microseconds has been observed for the time a request spends in a queue.
+Thus, such a large timeout would necessarily influence the overall behavior of the middleware introducing considerable complexity in a future formal analysis of its model.
+Since timing information in the logs are always rounded to microseconds, the timeout has been updated to \b{100 nanoseconds}.
+This can be considered negligible w.r.t. the timings registered in the logs.
+Finally, a slight loss in performance in terms of throughput has been observed, but this was very small in comparison to the one observed if the writer thread was to use busy waiting.
+Figure~\ref{fig:newtrace} depicts the outcome of the stability experiment performed with the same script as for the first report, for a total of $10$ minutes.
+This shows that the system is still stable.
+
+The second modification to the source code was of more technical nature.
+When performing the maximum throughput experiment, it emerged that with many virtual clients connecting to the middleware (about $500$ virtual clients) on the cloud, sometimes some of them reported errors by writing, even though on the local machine such errors did not appear.
+Skipping details, it was found, that this was due to the internal size of the socket's buffers.
+The solution was to add the following two lines after the creation of the sockets in the writer thread:
+\begin{center}
+    %\t{serverSockets[i].setOption(StandardSocketOptions.SO\char`_RCVBUF, Helper.HUGE\char`_BUFFER\char`_SZ);}\\
+    %\t{serverSockets[i].setOption(StandardSocketOptions.SO\char`_SNDBUF, Helper.HUGE\char`_BUFFER\char`_SZ);}
+    \t{serverSockets[i].setOption(StandardSocketOptions.SO\char`_RCVBUF, 2097152);}\\
+    \t{serverSockets[i].setOption(StandardSocketOptions.SO\char`_SNDBUF, 2097152);}
+\end{center}
+%where \t{HUGE\char`_BUFFER\char`_SZ = 2097152}.
+This would make socket's buffer's sizes \emph{larger} on the cloud, and avoid the problem.
+
+%Finally, it was observed that the default values for those buffers, in local are $530\,904$ and $1\,313\,280$, for \t{SO\char`_RCVBUF} and \t{SO\char`_SNDBUF} respectively, while on the cloud they are $186\,240$ and $23\,040$.
+%Anyway, it was noticed that both locally and on the cloud, whatever size was set, the maximum value to be actually set for both buffers was $212\,992$.
+%This is less than both sizes locally, but fortunately more than both on the cloud.
+
+
+\begin{figure}[!h]
+    \centering
+    \begin{minipage}[b]{0.45\linewidth}
+        \includegraphics[scale=0.6]{../../log/experiments/\newtrace/tps.pdf}
+    \end{minipage}
+    \hspace{0.2cm}
+    \begin{minipage}[b]{0.45\linewidth}
+        \centering
+        \includegraphics[scale=0.6]{../../log/experiments/\newtrace/rt.pdf}
+    \end{minipage}
+    \caption{Small stability trace of the new code (\hyperref[f:new-trace]{\t{new-trace}}).}
+    \label{fig:newtrace}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Logfile Listing}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+For each experiment, the logfiles (\t{*.log}) and the (eventual) data files (\t{*.data}) are collected inside a single ZIP file, located at
+\begin{center}
+    \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/tree/master/log/experiments/}
+\end{center}
+Table~\ref{tab:logs} indicates the names of the ZIP files of each experiment.
+For the maximum throughput experiment, the data files \t{*.data} are reproducible from the logfiles using the script
+\begin{center}
+    \url{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/scripts/reproduce_data/03_maximum_throughput_rd}\vspace{2mm}\\
+\end{center}
+(PDF plots of the data will be generated as well).
+Note that the script has to be manually adjusted for each of the three runs.
+
+\begin{table}[h]
+    \centering
+    \small
+    {
+        \smallskip
+        \begin{tabular}{|c|l|}
+            \hline
+            \textbf{Short name} & \textbf{Location} \\
+            \hline\hline
+            \t{max-tps1}\label{f:tps1} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\tpsfst.zip}{\t{\tpsfstd.zip}} \\
+            %\hline
+            \t{max-tps2}\label{f:tps2} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\tpssnd.zip}{\t{\tpssndd.zip}} \\
+            %\hline
+            \t{max-tps3}\label{f:tps3} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\tpstrd.zip}{\t{\tpstrdd.zip}} \\
+            %\hline
+            \hline
+            \t{repl-eff}\label{f:repl} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\repl.zip}{\t{\repld.zip}} \\
+            %\hline
+            \hline
+            \t{wrt-eff}\label{f:wrt} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\wrt.zip}{\t{\wrtd.zip}} \\
+            \hline
+            \hline
+            \t{5vs3}\label{f:5vs3} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\fvst.zip}{\t{\fvstd.zip}} \\
+            \hline
+            \t{new-trace}\label{f:new-trace} & \href{https://gitlab.inf.ethz.ch/fbanfi/asl-fall16-project/blob/master/log/experiments/\newtrace.zip}{\t{\newtraced.zip}} \\
+            \hline
+        \end{tabular} 
+    }
+    \caption{Location of referenced log and data files.}
+    \label{tab:logs}
+\end{table}
+\end{appendices}
+ 
+\end{document}

@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analyses/m3; ./2_MMm
+
+LOGDIR=../../../log/experiments/04_replication_effect_16-11-20_13:16:14
+REPETITIONS=4
+RUNTIME=50
+WARMUP=10
+STABLE_PHASE=30
+PLOTDIR=plots
+FONTSZ=20
+OUT=2_MMm
+m=3
+
+rm -f $OUT.data
+for S in $(seq 3 2 7)
+do
+    for R in {1,$((($S + 1) / 2)),$S}
+    do
+        echo -n "$S $R " >> $OUT.data
+        TPS_R=
+        RT_R=
+        mu_R=
+        for r in $(seq 1 $REPETITIONS)
+        do
+            TPS_C=
+            RT_C=
+            for c in $(seq 3)
+            do
+                # Compute TPS and RT from all times.
+                #TPS=$(cat $LOGDIR/client$c'_S'$S'_R'$R'_r'$r.log | tail -n 1 | awk '{ print $7 }')
+                #RT=$(cat $LOGDIR/client$c'_S'$S'_R'$R'_r'$r.log | grep Avg: | tail -n 1 | awk '{ print $2 }')
+
+                # Compute TPS and RT from stable phase.
+                TPS=$(cat $LOGDIR/client$c'_S'$S'_R'$R'_r'$r.log | grep -A 2 "Total Statistics" | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{print $4}')
+                TPS=$(echo "$TPS" | awk '{ x += $1 } END { print x / NR; }')
+                RTs=$(cat $LOGDIR/client$c'_S'$S'_R'$R'_r'$r.log | grep -A 2 "Total Statistics" | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{print $9}')
+                RT=$(echo "$RTs" | awk '{ x += $1 } END { print x / NR; }')
+                RT_STD=$(echo "$RTs" | awk -v avg=$RT '{ x += ($1 - avg) ^ 2 } END { print sqrt(x / (NR - 1)) }')
+
+                TPS_C=$(echo -e "$TPS_C\n$TPS")
+                RT_C=$(echo -e "$RT_C\n$RT")
+                RT_STD_C=$(echo -e "$RT_STD_C\n$RT_STD")
+            done
+            TPS_R=$(echo -e "$TPS_R\n$(echo "$TPS_C" | tail -n +2 | awk '{ x += $1 } END { print x }')")
+            RT_R=$(echo -e "$RT_R\n$(echo "$RT_C" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')")
+            RT_STD_R=$(echo -e "$RT_STD_R\n$(echo "$RT_STD_C" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')")
+
+            # Get mean service rate from memaslap logs as maximum TPS.
+            Xs1=$(cat $LOGDIR/client1_S$S'_R'$R'_r'$r.log | grep Total -A 2 | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $4 }')
+            Xs2=$(cat $LOGDIR/client2_S$S'_R'$R'_r'$r.log | grep Total -A 2 | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $4 }')
+            Xs3=$(cat $LOGDIR/client3_S$S'_R'$R'_r'$r.log | grep Total -A 2 | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $4 }')
+            mu_R=$(echo -e "$mu_R\n$(echo $mu $(paste <(echo "$Xs1") <(echo "$Xs2") <(echo "$Xs3") | awk '{ if (($1 + $2 + $3) / 3 > max) max = ($1 + $2 + $3) / 3 } END { print max } ') | awk '{ if ($1 > $2) print $1; else print $2 }')")
+        done
+        lambda=$(echo "$TPS_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+        mu=$(echo "$mu_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+        rho=$(echo $lambda $m $mu | awk '{ print $1 / ($2 * $3) }')
+        p0=$(echo $m $rho | awk '{ mf = 1; for (i = 1; i <= $1; ++i) mf *= i; for (n = 1; n <= $1 - 1; ++n) { nf = 1; for (i = 1; i <= n; ++i) nf *= i; S += (($1 * $2) ^ n) / nf } print 1 / (1 + (($1 * $2) ^ $1) / (mf * (1 - $2)) + S) }')
+        vrho=$(echo $m $rho $p0 | awk '{ mf = 1; for (i = 1; i <= $1; ++i) mf *= i; print ($1 * $2) ^ $1 / (mf * (1 - $2)) * $3 }')
+        Er=$(echo $mu $vrho $m $rho | awk '{ print 1000000 * 10 / $1 * (1 + $2 / ($3 * (1 - $4))) }')
+        sVr=$(echo $mu $vrho $m $rho | awk '{ print sqrt(1000000 * 10 / ($1 ^ 2) * (1 + ($2 * (2 - $2)) / ($3 ^ 2 * (1 - $4) ^ 2))) }')
+        rt=$(echo "$RT_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+        rt_std=$(echo "$RT_STD_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+        echo $lambda $mu $rho $p0 $vrho $Er $sVr $rt $rt_std >> $OUT.data
+    done
+    gnuplot -p << EOF
+        set terminal postscript eps color 'Times-Roman,$FONTSZ'
+        set output '| epstopdf --filter --outfile=$PLOTDIR/$OUT-$S.pdf'
+        set xlabel 'R (replication factor)'
+        set ylabel 'Response time ({/Symbol m}s)'
+        set xtics 1,$(((S - 1) / 2)),$S
+        set xrange [$(echo "1 - ($S - 1) / 4" | bc -l):$(echo "$S + ($S - 1) / 4" | bc -l)]
+        set yrange [0:16000]
+        set style line 1 lt 1 lw 2 pt 7 pi -1 ps 1.5
+        #set pointintervalbox 3
+        plot '<(tail -n 3 $OUT.data)' using 2:10 w linespoints ls 1 lc rgb '#268bd2' title 'Measured', \
+            '' using 2:10:11 w errorbars ls 1 lc rgb '#268bd2' notitle, \
+            '' using 2:8 w linespoints ls 1 lc rgb '#2aa198' title 'Modeled', \
+            '' using 2:8:9 w errorbars ls 1 lc rgb '#2aa198' notitle
+EOF
+    #sleep 1
+    #llpp $PLOTDIR/$OUT-$S.pdf &
+done
+
+mkdir -p $PLOTDIR
+RS=(one half full)
+
+for i in $(seq 0 2)
+do
+    gnuplot -p << EOF
+        set terminal postscript eps color 'Times-Roman,$FONTSZ'
+        set output '| epstopdf --filter --outfile=$PLOTDIR/$OUT-${RS[$i]}.pdf'
+        set xlabel 'S (number of servers)'
+        set ylabel 'Response time ({/Symbol m}s)'
+        set xtics 3,2,7
+        set xrange [2:8]
+        set yrange [0:16000]
+        set style line 1 lt 1 lw 2 pt 7 pi -1 ps 1.5
+        #set pointintervalbox 3
+        plot '<(awk -v i=$i "(NR - 1) % 3 == i" $OUT.data)' using 1:10 w linespoints ls 1 lc rgb '#268bd2' title 'Measured', \
+            '' using 1:10:11 w errorbars ls 1 lc rgb '#268bd2' notitle, \
+            '' using 1:8 w linespoints ls 1 lc rgb '#2aa198' title 'Modeled', \
+            '' using 1:8:9 w errorbars ls 1 lc rgb '#2aa198' notitle
+EOF
+    #sleep 1
+    #llpp $PLOTDIR/$OUT-${RS[$i]}.pdf &
+done
+
+# Compute changes by varying replication factor and fixed number of servers.
+cat $OUT.data | head -n 3 | awk '{ printf "%0.2f %0.2f ", $8, $10 }' | awk '{ printf "%0.2f%% %0.2f%% %0.2f%% %0.2f%%\n", $4/ $2 * 100, $6 / $4 * 100, $3 / $1 * 100, $5 / $3 * 100 }'
+cat $OUT.data | head -n 6 | tail -n 3 | awk '{ printf "%0.2f %0.2f ", $8, $10 }' | awk '{ printf "%0.2f%% %0.2f%% %0.2f%% %0.2f%%\n", $4/ $2 * 100, $6 / $4 * 100, $3 / $1 * 100, $5 / $3 * 100 }'
+cat $OUT.data | tail -n 3 | awk '{ printf "%0.2f %0.2f ", $8, $10 }' | awk '{ printf "%0.2f%% %0.2f%% %0.2f%% %0.2f%%\n", $4/ $2 * 100, $6 / $4 * 100, $3 / $1 * 100, $5 / $3 * 100 }'
+
+# Compute changes by varying number of servers and fixed replication factor.
+awk '(NR - 1) % 3 == 0' $OUT.data | awk '{ printf "%0.2f %0.2f ", $8, $10 }' | awk '{ printf "%0.2f%% %0.2f%% %0.2f%% %0.2f%%\n", $4/ $2 * 100, $6 / $4 * 100, $3 / $1 * 100, $5 / $3 * 100 }'
+awk '(NR - 1) % 3 == 1' $OUT.data | awk '{ printf "%0.2f %0.2f ", $8, $10 }' | awk '{ printf "%0.2f%% %0.2f%% %0.2f%% %0.2f%%\n", $4/ $2 * 100, $6 / $4 * 100, $3 / $1 * 100, $5 / $3 * 100 }'
+awk '(NR - 1) % 3 == 2' $OUT.data | awk '{ printf "%0.2f %0.2f ", $8, $10 }' | awk '{ printf "%0.2f%% %0.2f%% %0.2f%% %0.2f%%\n", $4/ $2 * 100, $6 / $4 * 100, $3 / $1 * 100, $5 / $3 * 100 }'
+
+
+

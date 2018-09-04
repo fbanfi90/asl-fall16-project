@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analyses/m3; ./4_factorial_experiment
+
+# Produce output for LaTeX table.
+LaTeX=true
+
+# Set experiment (put the one you want below the other).
+EXP=max_tps
+EXP=rep_eff
+
+# Set source directory and factors' levels.
+case $EXP in
+max_tps)
+    LOGDIR=../../../log/experiments/03_maximum_throughput_16-11-11_21:56:33
+    MINA=30
+    MAXA=50
+    MINB=16
+    MAXB=24
+    AS=($MINA $MAXA $MINA $MAXA)
+    BS=($MINB $MINB $MAXB $MAXB)
+    ;;
+rep_eff)
+    LOGDIR=../../../log/experiments/04_replication_effect_16-11-20_13:16:14
+    AS=(3 7 3 7)
+    BS=(1 1 3 7)
+    ;;
+esac
+
+# Set LaTeX table delimiters.
+if $LaTeX; then D='&'; E='\\'; P='\';
+else D=; E=; P=; fi
+
+# Constants and macros.
+I=(1 1 1 1)
+A=(-1 1 -1 1)
+B=(-1 -1 1 1)
+AB=(1 -1 -1 1)
+REPETITIONS=4
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+function ee { if (($1 < 10)); then echo "00$1"; elif (($1 < 100)); then echo "0$1"; else echo $1; fi }
+
+# Go through all 4 configurations and retrieve measurements and means.
+case $EXP in
+max_tps)
+    for i in $(seq 0 3)
+    do
+        # Repeat the experiment.
+        for R in $(seq 1 $REPETITIONS)
+        do
+            # Set log files names.
+            LOGFILE1=$LOGDIR/client1_C$(ee ${AS[$i]})_T$(e ${BS[$i]})_R$(e $R).log
+            LOGFILE2=$LOGDIR/client2_C$(ee ${AS[$i]})_T$(e ${BS[$i]})_R$(e $R).log
+            LOGFILE3=$LOGDIR/client3_C$(ee ${AS[$i]})_T$(e ${BS[$i]})_R$(e $R).log
+            LOGFILE4=$LOGDIR/client4_C$(ee ${AS[$i]})_T$(e ${BS[$i]})_R$(e $R).log
+            LOGFILE5=$LOGDIR/client5_C$(ee ${AS[$i]})_T$(e ${BS[$i]})_R$(e $R).log
+
+            # Read clients data.
+            TPS1=$(cat $LOGFILE1 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS1_AVG=$(echo $TPS1 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS2=$(cat $LOGFILE2 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS2_AVG=$(echo $TPS2 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS3=$(cat $LOGFILE3 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS3_AVG=$(echo $TPS3 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS4=$(cat $LOGFILE4 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS4_AVG=$(echo $TPS4 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS5=$(cat $LOGFILE5 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS5_AVG=$(echo $TPS5 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+
+            # Memorize TPS's AVG of this run.
+            TPS_AVG=$(echo $TPS1_AVG $TPS2_AVG $TPS3_AVG $TPS4_AVG $TPS5_AVG | awk '{print $1 + $2 + $3 + $4 + $5}')
+            YS+=($TPS_AVG)
+            TPS_AVGs="$TPS_AVGs $TPS_AVG"
+        done
+
+        TPS_AVG=$(echo $TPS_AVGs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+        YM+=($TPS_AVG)
+
+        # Reset variables.
+        TPS_AVGs=
+    done
+    ;;
+rep_eff)
+    for i in $(seq 0 3)
+    do
+        # Repeat the experiment.
+        for R in $(seq 1 $REPETITIONS)
+        do
+            # Read middleware data.
+            f=$LOGDIR/middleware_S${AS[$i]}'_'R${BS[$i]}'_'r$R.log
+            TOT=$(cat $f | tail -n 1 | awk '{ print $2 }')
+            MIN=$(($TOT / 300))
+            MAX=$((2 * $TOT / 300))
+            DATA=$(cat $f | grep GET | tail -n $MAX | head -n $MIN)
+
+            # Memorize RT's AVG of this run.
+            RT_AVG=$(echo "$DATA" | awk '{ tot += $3 } END { print tot / NR }')
+            YS+=($RT_AVG)
+            RT_AVGs="$RT_AVGs $RT_AVG"
+        done
+
+        RT_AVG=$(echo $RT_AVGs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+        YM+=($RT_AVG)
+
+        # Reset variables.
+        RT_AVGs=
+    done
+    ;;
+esac
+
+# Compute effects.
+for i in $(seq 0 3); do q0=$(echo $q0 | awk -v x=${I[$i]} -v y=${YM[$i]} '{ print $1 + x * y }'); done
+for i in $(seq 0 3); do qA=$(echo $qA | awk -v x=${A[$i]} -v y=${YM[$i]} '{ print $1 + x * y }'); done
+for i in $(seq 0 3); do qB=$(echo $qB | awk -v x=${B[$i]} -v y=${YM[$i]} '{ print $1 + x * y }'); done
+for i in $(seq 0 3); do qAB=$(echo $qAB | awk -v x=${AB[$i]} -v y=${YM[$i]} '{ print $1 + x * y }'); done
+Q0=$(echo $q0 | awk '{ print $1 / 4 }')
+QA=$(echo $qA | awk '{ print $1 / 4 }')
+QB=$(echo $qB | awk '{ print $1 / 4 }')
+QAB=$(echo $qAB | awk '{ print $1 / 4 }')
+
+# Print effects.
+echo EFFECTS:
+echo "$q0 $qA $qB $qAB"
+echo "$Q0 $QA $QB $QAB"
+echo
+
+# Compute estimate responses.
+for i in $(seq 0 3); do YE[$i]=$(echo "$Q0 ${A[$i]} $QA ${B[$i]} $QB ${AB[$i]} $QAB" | awk '{ print $1 + $2 * $3 + $4 * $5 + $6 * $7 }'); done
+
+# Compute errors.
+for i in $(seq 0 3)
+do
+    ER[$((4 * $i))]=$(echo ${YS[$((4 * $i))]} ${YE[$i]} | awk '{ print $1 - $2 }')
+    ER[$((4 * $i + 1))]=$(echo ${YS[$((4 * $i + 1))]} ${YE[$i]} | awk '{ print $1 - $2 }')
+    ER[$((4 * $i + 2))]=$(echo ${YS[$((4 * $i + 2))]} ${YE[$i]} | awk '{ print $1 - $2 }')
+    ER[$((4 * $i + 3))]=$(echo ${YS[$((4 * $i + 3))]} ${YE[$i]} | awk '{ print $1 - $2 }')
+done
+
+# Print errors table.
+echo ERRORS:
+for i in $(seq 0 3)
+do
+    echo \
+    $(($i + 1)) $D \
+    ${I[$i]} $D \
+    ${A[$i]} $D \
+    ${B[$i]} $D \
+    ${AB[$i]} $D \
+    ${YS[$((4 * $i))]} $D \
+    ${YS[$((4 * $i + 1))]} $D \
+    ${YS[$((4 * $i + 2))]} $D \
+    ${YS[$((4 * $i + 3))]} $D \
+    ${YM[$i]} $D \
+    ${YE[$i]} $D \
+    ${ER[$((4 * $i))]} $D \
+    ${ER[$((4 * $i + 1))]} $D \
+    ${ER[$((4 * $i + 2))]} $D \
+    ${ER[$((4 * $i + 3))]} $E
+done
+echo
+
+# Compute impacts.
+SSA=$(echo | awk -v qA=$QA '{ printf "%0.2f\n", 16 * qA ^ 2}')
+SSB=$(echo | awk -v qB=$QB '{ printf "%0.2f\n", 16 * qB ^ 2}')
+SSAB=$(echo | awk -v qAB=$QAB '{ printf "%0.2f\n", 16 * qAB ^ 2}')
+SSE=$(echo $(for i in $(seq 0 3)
+    do echo ${ER[$((4 * $i))]} ${ER[$((4 * $i + 1))]} ${ER[$((4 * $i + 2))]} ${ER[$((4 * $i + 3))]}
+done) | awk '{ for( i = 1; i <= NF; ++i) t += $i ^ 2; printf "%0.2f\n", t }')
+SST=$(echo | awk -v SSA=$SSA -v SSB=$SSB -v SSAB=$SSAB -v SSE=$SSE '{ printf "%0.2f", SSA + SSB + SSAB + SSE }')
+
+# Print impacts table.
+echo IMPACTS:
+P=$(if [ -z ${P+x} ]; then echo ' \b'; else echo $P; fi)
+echo SSA $D $SSA $D $(echo $SSA $SST | awk -v p=$P '{ printf "%0.2f%s%", $1 / $2 * 100, p }') $E
+echo SSB $D $SSB $D $(echo $SSB $SST | awk -v p=$P '{ printf "%0.2f%s%", $1 / $2 * 100, p }') $E
+echo SSAB $D $SSAB $D $(echo $SSAB $SST | awk -v p=$P '{ printf "%0.2f%s%", $1 / $2 * 100, p }') $E
+echo SSE $D $SSE $D $(echo $SSE $SST | awk -v p=$P '{ printf "%0.2f%s%", $1 / $2 * 100, p }') $E
+echo SST $D $SST $D 100.00$P% $E

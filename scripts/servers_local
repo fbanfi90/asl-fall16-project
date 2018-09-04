@@ -1,0 +1,33 @@
+#!/bin/zsh
+
+# Start servers.
+n=`expr $@ + 1`
+for i in  `seq 2 $n`
+do
+    memcached -p 1121$i -t 1 -m 1024 & PID=$!
+    echo $PID
+    PIDs=($PIDs $PID)
+    addrs=($addrs localhost:1121$i)
+done
+
+# Start middleware.
+java -jar dist/middleware-fbanfi.jar -l 127.0.0.1 -p 11211 -t 16 -r $@ -m $addrs
+
+# Kill servers.
+trap ctrl_c INT
+function ctrl_c()
+{
+    echo "Stopping servers... "
+    for i in $PIDs
+    do
+        echo "killing $i"
+        kill $i
+    done
+    echo "Done."
+    exit
+}
+
+while :
+do
+    sleep 1
+done

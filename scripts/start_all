@@ -1,0 +1,5 @@
+#!/bin/zsh
+
+for C in {10,9,8,3,2}; do urxvt -fn xft:terminus:pixelsize=24 -fb xft:terminus:pixelsize=24 -e ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms$C.westeurope.cloudapp.azure.com &; sleep 0.5; done
+for S in {7,6,5,4,1}; do urxvt -fn xft:terminus:pixelsize=24 -fb xft:terminus:pixelsize=24 -e ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms$S.westeurope.cloudapp.azure.com &; sleep 0.5; done
+urxvt -fn xft:terminus:pixelsize=24 -fb xft:terminus:pixelsize=24 -e ssh -oStrictHostKeyChecking=no fbanfi@fbanfiforaslvms11.westeurope.cloudapp.azure.com &

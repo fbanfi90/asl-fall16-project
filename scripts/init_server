@@ -1,0 +1,6 @@
+#!/bin/sh
+
+sudo apt-get update
+sudo apt-get install build-essential libevent-dev memcached
+sudo /etc/init.d/memcached stop
+sudo update-rc.d memcached disable

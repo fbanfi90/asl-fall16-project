@@ -1,0 +1,157 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/reproduce_data/03_maximum_throughput_rd experiment_name
+# NOTE: experiment_name is assumed to be located in directory $LOGDIR_ROOT/
+#       Also make sure to set all parameters *exactly* as in the original experiment!
+
+# Runs - put the one you want BELOW the others.
+
+#################################### RUN 1 ####################################
+MINC=10
+STPC=20
+MAXC=90
+MINT=8
+STPT=8
+MAXT=40
+###############################################################################
+
+#################################### RUN 2 ####################################
+MINC=10
+STPC=10
+MAXC=70
+MINT=16
+STPT=8
+MAXT=32
+###############################################################################
+
+#################################### RUN 3 ####################################
+MINC=40
+STPC=4
+MAXC=60
+MINT=16
+STPT=8
+MAXT=24
+###############################################################################
+
+# Constants and macros.
+EXPERIMENT=$@
+LOGDIR_ROOT=log/experiments
+REPLICATION=1
+REPETITIONS=4
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+function ee { if (($1 < 10)); then echo "00$1"; elif (($1 < 100)); then echo "0$1"; else echo $1; fi }
+
+echo -e "Removing old data . . . $PAD"
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+rm $LOGDIR.zip $LOGDIR/tps.*
+OUT=$LOGDIR/tps.data
+echo -e $OK
+
+# Variate number of virtual clients.
+for C in $(seq $MINC $STPC $MAXC)
+do
+    CC=$(($C * 5))
+    echo -n "$CC " >> $OUT
+
+    # Variate number of threads in thread pool of middleware.
+    for T in $(seq $MINT $STPT $MAXT)
+    do
+        # Repeat the experiment.
+        for R in $(seq 1 $REPETITIONS)
+        do
+            echo -e "===========[ C: $((5 * $C))/$((5 * $MAXC)) | T: $T/$MAXT | R: $R/$REPETITIONS ]=============\033[57G    "
+
+            # Set log files names.
+            LOGFILE1=$LOGDIR/client1_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE2=$LOGDIR/client2_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE3=$LOGDIR/client3_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE4=$LOGDIR/client4_C$(ee $C)_T$(e $T)_R$(e $R).log
+            LOGFILE5=$LOGDIR/client5_C$(ee $C)_T$(e $T)_R$(e $R).log
+
+            echo -e "Extracting data from clients' logs . . . $PAD"
+
+            # Read clients data.
+            TPS1=$(cat $LOGFILE1 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS1_AVG=$(echo $TPS1 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS1_STD=$(echo $TPS1 | awk -v avg="$TPS1_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS2=$(cat $LOGFILE2 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS2_AVG=$(echo $TPS2 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS2_STD=$(echo $TPS2 | awk -v avg="$TPS2_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS3=$(cat $LOGFILE3 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS3_AVG=$(echo $TPS3 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS3_STD=$(echo $TPS3 | awk -v avg="$TPS3_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS4=$(cat $LOGFILE4 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS4_AVG=$(echo $TPS4 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS4_STD=$(echo $TPS4 | awk -v avg="$TPS4_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+            TPS5=$(cat $LOGFILE5 | grep -B1 Global | awk 'NR % 6 == 1' | tail -n60 | head -n30 | awk '{print $4}')
+            TPS5_AVG=$(echo $TPS5 | awk '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+            TPS5_STD=$(echo $TPS5 | awk -v avg="$TPS5_AVG" '{sum=0}{for(i=1;i<=NF;i++){sum+=($i-avg)^2}}END{printf "%f\n", sum/(NF-1)}')
+
+            # Memorize TPS's AVG and STD of this run.
+            TPS_AVGs="$TPS_AVGs $(echo $TPS1_AVG $TPS2_AVG $TPS3_AVG $TPS4_AVG $TPS5_AVG | awk '{print $1 + $2 + $3 + $4 + $5}')"
+            TPS_STDs="$TPS_STDs $(echo $TPS1_STD $TPS2_STD $TPS3_STD $TPS4_STD $TPS5_STD | awk '{print sqrt($1 + $2 + $3 + $4 + $5)}')"
+
+            echo -e $OK
+        done
+
+        echo -e "Aggregating clients' data . . . $PAD"
+        TPS_AVG=$(echo $TPS_AVGs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+        TPS_STD=$(echo $TPS_STDs | awk -v rep="$REPETITIONS" '{sum=0}{for(i=1;i<=NF;i++){sum+=$i;}}END{printf "%f\n", sum/NF}')
+        echo -n "$TPS_AVG $TPS_STD " >> $OUT
+        echo -e $OK
+
+        # Reset variables.
+        TPS_AVGs=
+        TPS_STDs=
+    done
+    echo "" >> $OUT
+done
+
+echo "========================================================"
+echo -e "Compressing logs and data . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo "========================================================"
+echo -e "Plotting data . . . $PAD"
+cd $EXPERIMENT
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=tps.pdf'
+    set xlabel 'Number of virtual clients'
+    set ylabel 'Throughput (requests/s)'
+#    set xtics 50,100,450
+#    set xrange [0:500]
+#    set xtics 50,50,350
+#    set xrange [0:400]
+    set xtics 200,20,300
+    set xrange [180:320]
+    set yrange [0:]
+    set key c c title 'Threads'
+#    plot 'tps.data' u 1:2:3 w errorbars pt 13 lt 1 title '8', \
+#        '' u 1:2 w lines lt 1 notitle, \
+#        '' u 1:4:5 w errorbars pt 13 lt 2 title '16', \
+#        '' u 1:4 w lines lt 2 notitle, \
+#        '' u 1:6:7 w errorbars pt 13 lt 3 title '24', \
+#        '' u 1:6 w lines lt 3 notitle, \
+#        '' u 1:8:9 w errorbars pt 13 lt 4 title '32', \
+#        '' u 1:8 w lines lt 4 notitle, \
+#        '' u 1:10:11 w errorbars pt 13 lt 5 title '40', \
+#        '' u 1:10 w lines lt 5 notitle
+#    plot 'tps.data' u 1:2:3 w errorbars pt 13 lt 2 title '16', \
+#        '' u 1:2 w lines lt 2 notitle, \
+#        '' u 1:4:5 w errorbars pt 13 lt 3 title '24', \
+#        '' u 1:4 w lines lt 3 notitle, \
+#        '' u 1:6:7 w errorbars pt 13 lt 4 title '32', \
+#        '' u 1:6 w lines lt 4 notitle
+    plot 'tps.data' u 1:2:3 w errorbars pt 13 lt 2 title '16', \
+        '' u 1:2 w lines lt 2 notitle, \
+        '' u 1:4:5 w errorbars pt 13 lt 3 title '24', \
+        '' u 1:4 w lines lt 3 notitle
+EOF
+echo -e $OK
+
+echo "========================================================"
+echo "Experiment '$EXPERIMENT' terminated!"

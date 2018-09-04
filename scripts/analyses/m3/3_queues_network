@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Usage:
+# cd scripts/analyses/m3; ./3_queues_network
+
+S=3
+R=1
+LOGDIR=../../../log/experiments/04_replication_effect_16-11-20_13:16:14
+REPETITIONS=4
+RUNTIME=50
+WARMUP=10
+STABLE_PHASE=30
+
+# Concatenate timings in middle third of each repetition.
+for f in $LOGDIR/middleware_S$S'_'R$R'_'r{1,2,3,4}.log
+do
+    GET_TOT=$(cat $f | grep GET | tail -n 1 | awk '{ print $2 }')
+    GET_MIN=$(($GET_TOT / 300))
+    GET_MAX=$((2 * $GET_TOT / 300))
+    GET_DATA=$(echo -e "$GET_DATA\n$(cat $f | grep GET | tail -n $GET_MAX | head -n $GET_MIN)")
+    SET_TOT=$(cat $f | grep SET | tail -n 1 | awk '{ print $2 }')
+    SET_MIN=$(($SET_TOT / 300))
+    SET_MAX=$((2 * $SET_TOT / 300))
+    SET_DATA=$(echo -e "$SET_DATA\n$(cat $f | grep GET | tail -n $SET_MAX | head -n $SET_MIN)")
+done
+GET_DATA=$(echo "$GET_DATA" | tail -n +2)
+SET_DATA=$(echo "$SET_DATA" | tail -n +2)
+
+# Get means of timings.
+GET_AVGS=$(echo "$GET_DATA" | awk '{ pro += $3 - ($4 + $5); srv += $5; n++ } END { print pro / n, srv / n }')
+GET_PRO_mu=$(echo $GET_AVGS | awk '{ printf "%.9f", $1 / 1000000 }')
+GET_SRV_mu=$(echo $GET_AVGS | awk '{ printf "%.9f", $2 / 1000000 }')
+SET_AVGS=$(echo "$SET_DATA" | awk '{ pro += $3 - ($4 + $5); srv += $5; n++ } END { print pro / n, srv / n }')
+SET_PRO_mu=$(echo $SET_AVGS | awk '{ printf "%.9f", $1 / 1000000 }')
+SET_SRV_mu=$(echo $SET_AVGS | awk '{ printf "%.9f", $2 / 1000000 }')
+
+# Print mu's.
+echo $GET_PRO_mu $GET_SRV_mu
+echo $SET_PRO_mu $SET_SRV_mu
+
+# Compute TPS and RT from memaslap.
+for M in {4,9}
+do
+    AVG_R=
+    STD_R=
+    for r in $(seq 1 $REPETITIONS)
+    do
+        AVG_C=
+        STD_C=
+        for c in $(seq 3)
+        do
+            DATA=$(cat $LOGDIR/client$c'_'S$S'_'R$R'_'r$r.log | grep -A 2 "Total Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk -v M=$M '{ print $M }')
+            AVG=$(echo "$DATA" | awk '{ x += $1 } END { print x / NR }')
+            AVG_C=$(echo -e "$AVG_C\n$AVG")
+            if [ $M = 4 ]
+            then
+                STD=$(echo "$DATA" | awk -v avg=$AVG '{ x += ($1 - avg) ^ 2 } END { print x / (NR - 1) }')
+            else
+                STDs=$(cat $LOGDIR/client$c'_'S$S'_'R$R'_'r$r.log | grep -A 2 "Total Statistics"  | awk 'NR % 4 == 3' | head -n -1 | tail -n $(($RUNTIME - $WARMUP)) | head -n $STABLE_PHASE | awk '{ print $10 }')
+                STD=$(echo "$STDs" | awk '{ x += $1 } END { print x / NR }')
+            fi
+            STD_C=$(echo -e "$STD_C\n$STD")
+        done
+        if [ $M = 4 ]
+        then
+            AVG_R=$(echo -e "$AVG_R\n$(echo "$AVG_C" | tail -n +2 | awk '{ x += $1 } END { print x }')")
+            STD_R=$(echo -e "$STD_R\n$(echo "$STD_C" | tail -n +2 | awk '{ x += $1 } END { print sqrt(x) }')")
+        else
+            AVG_R=$(echo -e "$AVG_R\n$(echo "$AVG_C" | tail -n +2 | awk '{ x += $1 } END { print x / 3 }')")
+            STD_R=$(echo -e "$STD_R\n$(echo "$STD_C" | tail -n +2 | awk '{ x += $1 } END { print x / 3 }')")
+        fi
+    done
+    AVG=$(echo "$AVG_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+    STD=$(echo "$STD_R" | tail -n +2 | awk '{ x += $1 } END { print x / NR }')
+    echo $AVG $STD
+done

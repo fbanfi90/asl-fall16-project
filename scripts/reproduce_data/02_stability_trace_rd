@@ -1,0 +1,84 @@
+#!/bin/bash
+# START AT PROJECT ROOT: ./scripts/reproduce_data/02_stability_trace_rd experiment_name
+# NOTE: experiment_name is assumed to be located in directory $LOGDIR_ROOT/
+#       Also make sure to set $RUNTIME *exactly* as in the original experiment!
+
+# Constants and macros.
+EXPERIMENT=$@
+LOGDIR_ROOT=log/experiments
+RUNTIME=1h
+TIME_UNIT=$(echo -n $RUNTIME | tail -c 1)
+if [ $TIME_UNIT = s ]; then RUNTIME_SECONDS=$(echo ${RUNTIME%s})
+elif [ $TIME_UNIT = m ]; then RUNTIME_SECONDS=$(($(echo ${RUNTIME%m}) * 60))
+else RUNTIME_SECONDS=$(($(echo ${RUNTIME%h}) * 3600)); fi
+PAD="\033[51G\c"
+OK="[ \e[32mOK\e[0m ]"
+function e { if (($1 < 10)); then echo "0$1"; else echo $1; fi }
+
+# Set log folder on remote clients.
+LOGDIR=$LOGDIR_ROOT/$EXPERIMENT
+
+# Set log files names.
+LOGFILE1=$LOGDIR/client1.log
+LOGFILE2=$LOGDIR/client2.log
+LOGFILE3=$LOGDIR/client3.log
+
+echo -e "Removing old data . . . $PAD"
+rm -f $LOGDIR.zip $LOGDIR/tps.* $LOGDIR/rt.*
+echo -e $OK
+
+echo -e "Extracting data from clients' logs . . . $PAD"
+
+# Read client 1 data.
+TPS1=$(cat $LOGFILE1 | grep Period | awk '{print $4}' | awk 'NR % 3 == 0')
+AVGSTD1=$(cat $LOGFILE1 | grep Period | awk '{print $9" "$10}' | awk 'NR % 3 == 0')
+
+# Read client 2 data.
+TPS2=$(cat $LOGFILE2 | grep Period | awk '{print $4}' | awk 'NR % 3 == 0')
+AVGSTD2=$(cat $LOGFILE2 | grep Period | awk '{print $9" "$10}' | awk 'NR % 3 == 0')
+
+# Read client 3 data.
+TPS3=$(cat $LOGFILE3 | grep Period | awk '{print $4}' | awk 'NR % 3 == 0')
+AVGSTD3=$(cat $LOGFILE3 | grep Period | awk '{print $9" "$10}' | awk 'NR % 3 == 0')
+
+echo -e $OK
+
+echo -e "Aggregating clients' data . . . $PAD"
+OUT1=$LOGDIR/tps.data
+OUT2=$LOGDIR/rt.data
+echo "$(paste <(seq $RUNTIME_SECONDS) <(echo "$TPS1") <(echo "$TPS2") <(echo "$TPS3") | awk '{print $1" "($2+$3+$4)}')" >> $OUT1
+echo "$(paste <(seq $RUNTIME_SECONDS) <(echo "$AVGSTD1") <(echo "$AVGSTD2") <(echo "$AVGSTD3") | awk '{print $1" "($2+$4+$6)/3" "($3+$5+$7)/3}')" >> $OUT2
+echo -e $OK
+
+echo -e "Compressing logs and data . . . $PAD"
+cd $LOGDIR_ROOT
+zip -r $EXPERIMENT.zip $EXPERIMENT > /dev/null
+echo -e $OK
+
+echo -e "Plotting data . . . $PAD"
+cd $EXPERIMENT
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=tps.pdf'
+    set xlabel 'Time (s)'
+    set ylabel 'Throughput (requests/s)'
+    set xtics 0,600,3600
+    set xrange [0:3600]
+    set yrange [0:]
+    unset key
+    plot 'tps.data' w lines lc rgb '0x3366FF'
+EOF
+gnuplot <<- EOF
+    set terminal postscript eps color 'Times-Roman'
+    set output '| epstopdf --filter --outfile=rt.pdf'
+    set xlabel 'Time (s)'
+    set ylabel 'Response time ({/Symbol m}s)'
+    set xtics 0,600,3600
+    set xzeroaxis
+    set xrange [0:3600]
+    unset key
+    plot 'rt.data' w errorbars lc rgb '0x77AAFF', '' u 2 pt 13 ps 0.5 lc rgb '0x3366FF'
+EOF
+echo -e $OK
+
+echo "Data for experiment '$EXPERIMENT' reproduced!"
